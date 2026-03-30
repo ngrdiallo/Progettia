@@ -16,43 +16,21 @@ Stato avanzamento (esecuzione):
 - Problema 10: COMPLETATO (protocollo handoff + budget/timeout + trace audit + guard escalation + test verdi)
 - Problema 11: COMPLETATO (baseline verificata - memoria server-side gia risolta da problema 8)
 - Problema 13: COMPLETATO (Thinking Contract v1 deterministico backend/UI + gate verdi)
-- Problema 14: COMPLETATO (tool directory controllato: allowlist + budget + audit + test boundary/sicurezza)
+- Problema 14: COMPLETATO su `vsc` (tool directory controllato: allowlist + budget + audit + test boundary/sicurezza)
 - Problema 15: TODO (tool web search controllato)
 - Problema 16: TODO (MATRIOSKA - pipeline multi-modello locale)
 - Problema 17: TODO (verifica claim esterni)
 - Problema 18: TODO (baseline modelli locali + orchestrazione)
 
 Stato merge:
-- Modifiche `vsc` e `opc` importate nel workspace `ai-stack` (main locale) in data 30/03/2026.
-- Stato remoto: NON ancora commit/push su origin (da finalizzare).
+- Implementazioni piu recenti valide su `ai-stack-vsc` (branch `vsc`).
+- NON ancora merged su `opc` e `ai-stack` generale.
 
-### Workflow parallelo merge-safe (regola fissa)
-W1. Repository sorgente unico: `Progettia` (cartella `ai-stack`).
-W2. Branch naming obbligatorio: `feat/<id>-<topic>` (es. `feat/12.2-fs-guard`).
-W3. Lock file caldi nel todo prima di edit:
-- `static/chat.html`
-- `server.py`
-- `router_core.py`
-- `todoproblem`
-W4. Una sola issue tecnica attiva per branch.
-W5. Gate obbligatori prima merge:
-- `scripts/preflight_runtime.py --base-url http://127.0.0.1:8000`
-- `scripts/smoke_runtime.py --base-url http://127.0.0.1:8000`
-- `scripts/acceptance_think_ui.py`
-W6. Porte locali fisse:
-- `master` -> 8000
-- `feat/vsc-*` -> 8001
-- `feat/opc-*` -> 8002
-W7. Merge policy:
-- rebase/merge su `master` aggiornato
-- niente push se gate non verdi
-- update `todoproblem` con evidenze finali
-
-### Modifiche sessione corrente (30/03/2026):
+### Modifiche sessione corrente (30/03/2026) - BRANCH OPC:
 - Fix 1: Sostituito pulsante "jumpToLatestBtn" con solo icona ↓ (rimosso testo "Nuovo messaggio")
 - Fix 2: Aggiunto endpoint GET /api/chat/{session_id}/messages per caricare messaggi da server
 - Fix 3: Aggiornato loadSessions() per fetch messaggi dopo sync (persistenza corretta dopo ricarico pagina)
-- NOTA: Queste modifiche ora sono presenti in `ai-stack` locale, in attesa di commit/push.
+- NOTA: Queste modifiche sono SOLO su branch `opc`, non ancora merged.
 ### 13.5 Evidenze di verifica (chiusura)
 13.5.1 acceptance_think_ui: OK
 13.5.2 smoke_runtime: OK

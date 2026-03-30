@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+chat_history.db
+_tmp_*
+debug.log
+nul
