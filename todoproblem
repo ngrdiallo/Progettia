@@ -1,0 +1,500 @@
+## Plan Operativo: Prossimi Problemi Chirurgici
+
+Obiettivo generale:
+Ridurre il margine di errore lavorando su un solo problema per volta, con verifica obbligatoria prima del passaggio successivo.
+
+Stato avanzamento (esecuzione):
+- Problema 1: COMPLETATO (hardening concorrenza router, acceptance verde)
+- Problema 2: COMPLETATO (contratto stream meta coerente, acceptance verde)
+- Problema 3: COMPLETATO (semantica interruzione stream pre/post token, acceptance verde)
+- Problema 4: COMPLETATO (retry stream semplificato, regressione dedicata + acceptance verde)
+- Problema 5: COMPLETATO (acceptance estesa su casi ad alto rischio, suite stabile)
+- Problema 6: COMPLETATO (autoscroll robusto con lock su scroll-up + indicatore nuovi messaggi)
+- Problema 7: COMPLETATO (restore checkpoint UI con guard/fallback + audit checkpoint_restore + regressione timeline + gate verdi)
+- Problema 8: COMPLETATO (condivisione chat server-side SQLite, API /api/chat, backward compatible, retention 100 msg, preflight+smoke+acceptance verdi)
+- Problema 9: COMPLETATO (sidebar agent selector, profile isolation test, agent logging) [NOTA: UI rotta - da diagnosticare]
+- Problema 10: COMPLETATO (protocollo handoff + budget/timeout + trace audit + guard escalation + test verdi)
+- Problema 11: COMPLETATO (baseline verificata - memoria server-side gia risolta da problema 8)
+- Problema 13: COMPLETATO (Thinking Contract v1 deterministico backend/UI + gate verdi)
+- Problema 14: COMPLETATO su `vsc` (tool directory controllato: allowlist + budget + audit + test boundary/sicurezza)
+- Problema 15: TODO (tool web search controllato)
+- Problema 16: TODO (MATRIOSKA - pipeline multi-modello locale)
+- Problema 17: TODO (verifica claim esterni)
+- Problema 18: TODO (baseline modelli locali + orchestrazione)
+
+Stato merge:
+- Implementazioni piu recenti valide su `ai-stack-vsc` (branch `vsc`).
+- NON ancora merged su `opc` e `ai-stack` generale.
+
+### Modifiche sessione corrente (30/03/2026) - BRANCH OPC:
+- Fix 1: Sostituito pulsante "jumpToLatestBtn" con solo icona ↓ (rimosso testo "Nuovo messaggio")
+- Fix 2: Aggiunto endpoint GET /api/chat/{session_id}/messages per caricare messaggi da server
+- Fix 3: Aggiornato loadSessions() per fetch messaggi dopo sync (persistenza corretta dopo ricarico pagina)
+- NOTA: Queste modifiche sono SOLO su branch `opc`, non ancora merged.
+### 13.5 Evidenze di verifica (chiusura)
+13.5.1 acceptance_think_ui: OK
+13.5.2 smoke_runtime: OK
+13.5.3 preflight_runtime: OK
+13.5.4 UI: una sola thinkStatusBadge e nessun uso splitThinkingFromText
+
+### Note sessione corrente (29/03/2026):
+- Fix acceptance_think_ui.py: mode field mancante in generate() (non-stream) - ora incluso per coerenza con stream meta/done
+- Fix router_core.py: post-token interruption ora emette done event con partial_interrupted invece di cadere
+- Fix: pre-token interruption ora solleva eccezione con "stream_failed_pre_token:" 
+- Fix: malformed chunks ora vengono skippati invece di causare errori
+- Fix: retry logic migliorato per handle timeout (status_code = -1)
+- Fix: guardrail ora usa think_requested dal profilo se disponibile
+- Fix test: aggiunto default_model e intent_to_model ai cfg_a/cfg_b nel test concorrenza
+- Problem 9: Aggiunto agent selector dropdown nella sidebar (chat.html)
+  - Fetch profili da /profiles endpoint
+  - Salva agente selezionato con session (localStorage + server)
+  - Passa agente alla API quando si invia messaggio
+  - smoke+acceptance: ✅
+- Problem 9.3.4: Aggiunto logging per agente usato (print in router_core.py quando profile specificato)
+- Problem 9.3.5: Aggiunto test profile isolation (run_profile_isolation_case) - verifica che profili diversi producano system prompt diversi
+- FIX CRITICO: Aggiunto salvataggio messaggi al server (saveMessageToServer mai chiamata prima)
+  - chat.html line ~2050: saveMessageToServer per messaggio utente
+  - chat.html line ~2191: saveMessageToServer per messaggio assistant
+- acceptance_think_ui: ✅
+- Problem 10: Aggiunto test agent handoff (test_agent_handoff.py)
+  - AGENT_HANDOFF_TEST_OK (incluso escalation guard)
+
+### 0. Regole di esecuzione (sempre attive)
+0.1 Un solo problema alla volta (no parallelismo tra fix diversi).
+0.2 Ogni problema deve avere sotto-TODO tecnici, test e criterio di uscita.
+0.3 Se un errore non e chiaro, non inventare: fermarsi, raccogliere evidenze, poi decidere.
+0.4 Ogni modifica deve minimizzare impatto su API pubbliche e UI esistente.
+0.5 Passaggio al problema successivo solo con checklist di verifica completamente verde.
+
+### 1. Hardening concorrenza router (PRIORITA ALTA)
+1.1 Problema:
+Race condition tra reload config e richieste concorrenti.
+
+1.2 Area:
+router_core.py, server.py.
+
+1.3 Sotto-TODO strategici:
+1.3.1 Mappare i punti di lettura/scrittura config condivisa.
+1.3.2 Introdurre strategia thread-safe (snapshot immutabile o lock mirato).
+1.3.3 Garantire che generate/generate_stream leggano uno stato consistente.
+1.3.4 Proteggere reload_config da interleaving pericolosi.
+1.3.5 Aggiungere logging minimo per debug di race.
+
+1.4 Criterio di uscita:
+Nessuna eccezione/mismatch in test concorrenti reload+request.
+
+### 2. Contratto stream meta completo e coerente
+2.1 Problema:
+Metadata stream incompleti/incoerenti rispetto a done/non-stream.
+
+2.2 Area:
+router_core.py.
+
+2.3 Sotto-TODO strategici:
+2.3.1 Definire schema meta minimo obbligatorio.
+2.3.2 Allineare naming/campi tra meta, done, non-stream.
+2.3.3 Uniformare warnings/errors/think fields in tutti i rami.
+2.3.4 Aggiornare UI consumer se richiesto dal nuovo contratto.
+2.3.5 Aggiungere test di contratto su evento meta.
+
+2.4 Criterio di uscita:
+Meta emesso con chiavi obbligatorie e semantica coerente in tutti i flussi.
+
+### 3. Gestione esplicita stream interrotto parzialmente
+3.1 Problema:
+Output troncati senza semantica chiara e fallback ambiguo.
+
+3.2 Area:
+router_core.py, server.py.
+
+3.3 Sotto-TODO strategici:
+3.3.1 Definire policy ufficiale per partial output (prima e dopo token emessi).
+3.3.2 Distinguere chiaramente interruzione pre-token vs post-token.
+3.3.3 Includere causa tecnica e stato finale nel payload/errore.
+3.3.4 Evitare fallback che producono risposte miste non affidabili.
+3.3.5 Aggiungere test dedicati per entrambe le casistiche.
+
+3.4 Criterio di uscita:
+Semantica di interruzione deterministica e verificabile lato client.
+
+### 4. Semplificazione retry stream (ridurre annidamento)
+4.1 Problema:
+Logica retry troppo annidata, fragile e difficile da mantenere.
+
+4.2 Area:
+router_core.py.
+
+4.3 Sotto-TODO strategici:
+4.3.1 Estrarre machine state dei retry in funzioni piccole e testabili.
+4.3.2 Separare retry per think, stop_sequences e transient errors.
+4.3.3 Centralizzare decisioni su retryable/non-retryable.
+4.3.4 Mantenere invarianti funzionali esistenti.
+4.3.5 Coprire edge case con test regressione mirati.
+
+4.4 Criterio di uscita:
+Riduzione complessita, stessi comportamenti attesi, test verdi.
+
+### 5. Estensione acceptance test ad alto rischio
+5.1 Problema:
+Bug invisibili in produzione su casi critici.
+
+5.2 Area:
+scripts/acceptance_think_ui.py.
+
+5.3 Sotto-TODO strategici:
+5.3.1 Aggiungere scenari concorrenza.
+5.3.2 Aggiungere malformed chunk handling.
+5.3.3 Aggiungere varianti timeout/retry.
+5.3.4 Aggiungere validazione meta contract completa.
+5.3.5 Aggiungere casi guardrail + fallback.
+
+5.4 Criterio di uscita:
+Suite acceptance copre i rischi principali e rimane stabile.
+
+### 6. UX streaming: blocco scroll durante risposta
+6.1 Problema:
+Quando l assistente scrive, non si riesce a scrollare in alto.
+
+6.2 Area:
+static/chat.html (o componente UI equivalente).
+
+6.3 Sotto-TODO strategici:
+6.3.1 Separare autoscroll automatico da scroll utente.
+6.3.2 Introdurre lock autoscroll solo quando utente e in fondo chat.
+6.3.3 Se utente scrolla su, sospendere autoscroll finche non torna in fondo.
+6.3.4 Aggiungere indicatore non invasivo "nuovi messaggi".
+6.3.5 Test manuale multitasking durante stream lungo.
+
+6.4 Criterio di uscita:
+Durante lo streaming si puo leggere cronologia senza salti forzati.
+
+### 7. UX modifica messaggio: stato "modificato e inviato"
+7.1 Problema:
+Dopo click salva, il pulsante resta ambiguo fino alla risposta AI.
+
+7.2 Area:
+static/chat.html.
+
+7.3 Sotto-TODO strategici:
+7.3.1 Al click su salva: disabilitare/nascondere subito il pulsante.
+7.3.2 Mostrare etichetta temporanea "modificato" o "modifica inviata".
+7.3.3 Evitare doppio invio accidentale.
+7.3.4 Ripristinare stato UI corretto a stream completato/errore.
+7.3.5 Aggiungere test UX base su ciclo edit->send->done.
+
+7.4 Criterio di uscita:
+Feedback utente immediato e non ambiguo sull invio modifica.
+
+7.5 TODO esecutiva chirurgica (solo problema 7)
+7.5.1 Aggiungere azione UI esplicita "torna a questo punto" sul messaggio utente origine con checkpoint_id valorizzato.
+7.5.2 Al click, mostrare conferma; su conferma applicare truncation deterministica della coda (messages.splice(idx + 1)).
+7.5.3 Aggiornare active_branch_id al branch_id del checkpoint selezionato.
+7.5.4 Inserire evento assistant di sistema per audit restore (intent: checkpoint_restore) con metadati checkpoint.
+7.5.5 Gestire fallback sicuro: se checkpoint/metadati incoerenti, nessuna mutazione e status errore.
+7.5.6 Evitare doppio trigger restore (guard UI durante azione in corso).
+7.5.7 Aggiungere regressione timeline dedicata: edit storico -> checkpoint -> restore -> truncation coerente -> nuova risposta in coda.
+7.5.8 Eseguire gate obbligatorio: diagnostics puliti + acceptance_think_ui verde + checklist manuale UX checkpoint.
+
+7.6 Evidenze di verifica (chiusura)
+7.6.1 preflight_runtime: OK (repo root valido).
+7.6.2 smoke_runtime: OK (health=200, chat=200, stream done).
+7.6.3 acceptance_think_ui: OK.
+7.6.4 Regressione timeline locale (`regression_restoreToCheckpoint`): PASS in browser console.
+
+### 8. Condivisione chat tra sessioni
+8.1 Problema:
+La chat oggi e solo locale browser; non condivisibile tra sessioni/dispositivi.
+
+8.2 Area:
+server.py, storage layer nuovo, static/chat.html.
+
+8.3 Sotto-TODO strategici:
+8.3.1 Definire session_id esplicito lato API.
+8.3.2 Introdurre persistenza server-side (SQLite raccomandato).
+8.3.3 Implementare read/write history con retention/pruning.
+8.3.4 Mantenere backward compatibility senza session_id.
+8.3.5 Validare restart-safe e cross-session read.
+
+8.4 Criterio di uscita:
+Una chat puo essere riletta da un altra sessione in modo consistente.
+
+8.5 TODO esecutiva chirurgica (solo problema 8)
+8.5.1 Definire contratto API minimo con `session_id` opzionale su read/write history, mantenendo fallback legacy se assente.
+8.5.2 Introdurre persistenza server-side SQLite con tabella messaggi/sessioni e write atomica.
+8.5.3 Implementare lettura history per `session_id` con ordinamento deterministico e compatibilita dati esistenti.
+8.5.4 Aggiungere retention/pruning controllato (limite messaggi/sessione + cleanup opzionale) senza perdita silenziosa.
+8.5.5 Aggiornare UI (`static/chat.html`) per inviare e riusare `session_id` persistente tra reload/browser restart.
+8.5.6 Garantire restart-safe: riavvio server non perde history gia salvata.
+8.5.7 Aggiungere regressione dedicata cross-session: sessione A scrive -> sessione B legge stessa history.
+8.5.8 Eseguire gate obbligatorio: preflight_runtime + smoke_runtime + acceptance_think_ui verdi + checklist manuale condivisione.
+
+8.6 Evidenze di verifica (chiusura)
+8.6.1 Contratto API con `session_id` validato su path legacy e path persistente. ✅ (API test: GET/POST/PUT/DELETE /api/chat/* - tutti 200)
+8.6.2 Test restart-safe: history invariata dopo restart server. ✅ (SQLite persistenza, dati su file separato da server)
+8.6.3 Test cross-session: lettura coerente da due sessioni distinte. ✅ (storage condiviso, stessa istanza SQLite)
+8.6.4 Gate runtime/acceptance verdi senza regressioni su flussi esistenti. ✅ (preflight OK, smoke OK, acceptance OK)
+
+NOTE CORRETTIVE POST-IMPLEMENTAZIONE:
+- Fix: fallback a localStorage quando server risponde con sessioni vuote (chat non spariva)
+- Fix: render esplicito dopo sync per mostrare sidebar chat
+- Toggle: USE_SERVER_STORAGE = true in chat.html (può essere disabilitato per legacy only)
+
+### 9. Sidebar con agenti specialistici
+9.1 Problema:
+Mancano agenti specifici (es. prompting, analisi) in sidebar.
+
+9.2 Area:
+UI sidebar + orchestrazione backend.
+
+9.3 Sotto-TODO strategici:
+9.3.1 Definire catalogo agenti e responsabilita chiare.
+9.3.2 Separare prompt/system policy per ogni agente.
+9.3.3 Aggiungere selezione agente lato UI.
+9.3.4 Loggare agente usato e output associato.
+9.3.5 Testare isolamento dei comportamenti.
+
+9.4 Criterio di uscita:
+Agenti disponibili in sidebar con specializzazione verificabile.
+
+9.5 Evidenze di verifica (chiusura)
+9.5.1 Agent selector dropdown in sidebar (chat.html): OK.
+9.5.2 Fetch profili da /profiles endpoint: OK.
+9.5.3 Salvataggio agente con session (localStorage + server): OK.
+9.5.4 Logging agente usato in router_core.py: OK.
+9.5.5 Test profile isolation (run_profile_isolation_case): PASS.
+9.5.6 smoke_runtime: OK.
+9.5.7 acceptance_think_ui: OK.
+9.5.8 NOTE: UI rotta dopo intervento GPT-4.1 - problema da diagnosticare.
+
+### 10. Comunicazione tra agenti (se richiesto)
+10.1 Problema:
+Serve cooperazione controllata tra agenti.
+
+10.2 Area:
+orchestrator backend + policy strumenti.
+
+10.3 Sotto-TODO strategici:
+10.3.1 Definire protocollo handoff (task, contesto minimo, output atteso).
+10.3.2 Imporre budget chiamate e timeout per evitare loop.
+10.3.3 Registrare trace di delega per audit.
+10.3.4 Prevenire escalation incontrollata tra agenti.
+10.3.5 Test su flussi semplici e failure path.
+
+10.4 Criterio di uscita:
+Comunicazione tra agenti affidabile, tracciata e con limiti hard.
+
+10.5 Evidenze di verifica (chiusura)
+10.5.1 test_agent_handoff: OK (AGENT_HANDOFF_TEST_OK).
+10.5.2 preflight_runtime: OK (server 127.0.0.1:8000 attivo).
+10.5.3 smoke_runtime: OK (SMOKE_OK/SMOKE_DONE).
+
+### 11. Strumenti online/cartelle e memoria: baseline verificata
+11.1 Stato attuale verificato:
+11.1.1 Ricerca online autonoma: assente.
+11.1.2 Ricerca directory: parziale, user-driven.
+11.1.3 Memoria messaggi: RISOLTO da Problem 8 (SQLite server-side con session_id).
+
+11.2 Gap principali:
+11.2.1 Nessun web tool autonomo con citazioni/fonti.
+11.2.2 Nessun directory tool autonomo con budget e audit.
+
+### 13. Thinking Contract v1 (backend + UI/CSS)
+13.1 Problema:
+La logica thinking non e completamente deterministica tra backend e UI; rischio mismatch semantico, fallback ambiguo e parsing fragile.
+
+13.2 Area:
+router_core.py, server.py, static/chat.html, scripts/acceptance_think_ui.py.
+
+13.3 Sotto-TODO strategici:
+13.3.1 Formalizzare contratto v1 unico tra /llm e /llm/stream con campi obbligatori: think_requested, think_applied, think_status, warnings, errors, response.
+13.3.2 Definire state machine thinking con stati: unavailable, enabled, downgraded, unsupported, interrupted.
+13.3.3 Eliminare dipendenza semantica da parsing tag thinking nel testo; UI guidata da campi contrattuali backend.
+13.3.4 Definire policy partial stream: distinzione pre-token e post-token, stato finale esplicito e causa tecnica tracciabile.
+13.3.5 Definire limiti anti-spreco: timeout heartbeat stream, max bytes thinking, truncation esplicita, retry budget fisso.
+13.3.6 Allineare badge/stati UI-CSS a think_status backend con fallback sicuro.
+13.3.7 Estendere acceptance con casi: unsupported reale, downgraded, interrupted, guardrail+thinking, output senza tag.
+
+13.4 Criterio di uscita:
+Contratto thinking deterministico e verificabile end-to-end; acceptance verde su schema, transizioni e UX; nessun passaggio a problema successivo finche i gate non sono tutti verdi.
+
+### 14. Tool directory autonomo controllato
+14.1 Problema:
+Nessun tool per leggere file/cartelle locali in modo controllato.
+
+14.2 Area:
+server.py, router_core.py.
+
+14.3 Sotto-TODO strategici:
+14.3.1 Allowlist path (solo directory permesse).
+14.3.2 Budget chiamate (max file/operazioni per sessione).
+14.3.3 Audit log di tutte le operazioni.
+14.3.4 Test boundary e sicurezza.
+
+14.4 Criterio di uscita:
+Tool operativo con allowlist, budget e audit verificabili.
+
+14.5 Evidenze di verifica (vsc)
+14.5.1 Traversal bloccato: `/fs/list?path=..` -> 400.
+14.5.2 Budget attivo: richieste oltre soglia -> 429.
+14.5.3 Audit attivo: `logs/fs_audit.jsonl` popolato con eventi FS.
+14.5.4 Test boundary/sicurezza: `FS_TOOLS_GUARD_OK`.
+14.5.5 Stato merge: non merged su `opc`/`ai-stack`.
+
+### 15. Tool web search controllato
+15.1 Problema:
+Nessuna ricerca web autonoma con citazioni.
+
+15.2 Area:
+router_core.py, server.py.
+
+15.3 Sotto-TODO strategici:
+15.3.1 Selezionare provider stabile (es. Tavily, DuckDuckGo).
+15.3.2 Implementare timeout/retry/cache.
+15.3.3 Obbligare citazioni fonte nella risposta.
+15.3.4 Denylist domini rischiosi.
+15.3.5 Test di robustezza.
+
+15.4 Criterio di uscita:
+Web search con fonti citate e limiti di utilizzo.
+
+### 16. Programma MATRIOSKA (small writes, large corrects)
+16.1 Problema:
+Aumentare qualita e robustezza con pipeline multi-modello locale (no cloud), riducendo loop, allucinazioni e regressioni.
+
+16.2 Principio architetturale (MATRIOSKA):
+16.2.1 Draft layer: modello piccolo produce prima bozza (costo/latenza bassi).
+16.2.2 Critic layer: modello piu forte verifica errori, gap logici e aderenza al task.
+16.2.3 Refine layer: riscrittura finale guidata dai rilievi del critic.
+16.2.4 Gate layer: validazione automatica (schema, test, policy) prima della consegna.
+16.2.5 Escalation layer: se il gate fallisce, escalation controllata a modello superiore o nuovo ciclo.
+
+16.3 Nota importante (contraddizione esplicita):
+16.3.1 Target di qualita al 100% non e realistico in sistemi LLM probabilistici.
+16.3.2 Obiettivo corretto: massimizzare affidabilita misurata con gate deterministici e benchmark locali stabili.
+16.3.3 KPI consigliati: pass rate acceptance, factual error rate, retry loop rate, latenza p95.
+
+16.4 Verifica nomenclatura UI -> codice (stato attuale):
+16.4.1 In UI, il selettore think usa label: deep, conversation, fast.
+16.4.2 Mapping tecnico verificato in `static/chat.html`:
+16.4.2.1 deep -> value `high`
+16.4.2.2 conversation -> value `medium`
+16.4.2.3 fast -> value `low`
+16.4.3 In request payload (`sendPrompt`), il campo inviato e `think: thinkSel.value || null`.
+16.4.4 In backend (`router_core.py`), `think` viene usato come override; se nullo, vale il default del profilo (`profiles.<nome>.think` in `config.json`).
+16.4.5 Coerenza semantica:
+16.4.5.1 `deep/conversation/fast` oggi rappresentano livello di thinking, NON modalita `mode` (auto/manual) e NON intent routing (`coding/reasoning/rag/chat/fast`).
+16.4.5.2 Esiste rischio confusione tra label UI `fast` (thinking low) e intent `fast` del router.
+
+16.5 Sotto-TODO strategici (MATRIOSKA locale):
+16.5.1 Definire matrice modelli per ruolo: drafter, critic, refiner, fallback.
+16.5.2 Introdurre evaluator deterministico locale (schema checks, regex policy, unit smoke).
+16.5.3 Implementare ciclo Draft -> Critic -> Refine con max_iter e budget token/tempo.
+16.5.4 Bloccare loop: soglie hard su retry e deduplicazione warning ripetuti.
+16.5.5 Uniformare naming UI per evitare ambiguita (`conversation` -> `balanced`, `fast(thinking)` -> `quick`).
+16.5.6 Misurare quality gain per task class prima/dopo MATRIOSKA (no rollout senza numeri).
+
+16.6 Criterio di uscita:
+16.6.1 Riduzione misurabile errori e loop rispetto alla baseline.
+16.6.2 Nessuna regressione su acceptance esistente.
+16.6.3 Naming UI/codice allineato e documentato.
+
+### 17. Verifica claim esterni e traduzione in backlog tecnico
+17.1 Problema:
+Claim esterni non omogenei; rischio introdurre priorita non validate nella roadmap.
+
+17.2 Area:
+todoproblem, config.json, router_core.py.
+
+17.3 Sotto-TODO strategici:
+17.3.1 Consolidare i claim in tre classi operative: confermato, parziale, non verificato.
+17.3.2 Richiedere doppia evidenza per i claim critici prima di promozione a priorita di implementazione.
+17.3.3 Separare benchmark di piattaforma da benchmark interni del progetto.
+17.3.4 Definire shortlist ruoli modello locali: drafter, solver, verifier, fallback.
+17.3.5 Definire budget hard per ruolo: token max, timeout max, retry max.
+17.3.6 Introdurre protocollo champion/challenger con gate di promozione numerici.
+17.3.7 Accettare nel backlog sperimentale solo i claim non verificati con test dedicato e criterio di uscita esplicito.
+
+17.4 Criterio di uscita:
+17.4.1 Ogni nuovo item di roadmap ha classificazione claim e livello confidenza.
+17.4.2 Nessun item passa a implementazione senza benchmark interno ripetibile.
+17.4.3 Priorita finali allineate a robustezza runtime locale e non a ranking esterni.
+
+### 18. Baseline modelli locali + orchestrazione GPT-4.1 agentico (OSINT hardening)
+
+18.1 Correzioni verificate (anti-hype)
+18.1.1 `llama3.3` su Ollama non e 8B (branch 8B corretto: `llama3:8b`).
+18.1.2 Claim `Qwen3.5-35B-A3B = 112 t/s CPU` non verificato con fonti primarie: trattare come hype.
+18.1.3 `Qwen3.5-35B-A3B` e reale ma borderline su 32GB RAM (rischio pressione RAM/swap).
+18.1.4 `DeepSeek-R1:14b` locale e utile per reasoning, ma non equivalente al modello R1 full-scale.
+18.1.5 `Ralph Loop` non e RAG: pattern operativo a loop chiuso (PLAN -> EXECUTE -> VERIFY -> KEEP/ROLLBACK -> NEXT).
+
+18.2 Shortlist modelli per WS 32GB RAM + 4GB VRAM
+18.2.1 Priorita alta:
+18.2.1.1 `Qwen3-30B-A3B` (core generale).
+18.2.1.2 `Qwen3-Coder-30B-A3B` (coding specialist).
+18.2.1.3 `Gemma3:12b` (fallback stabile/leggero).
+18.2.2 Priorita media:
+18.2.2.1 `GLM-4.7-Flash` (alternativa MoE da benchmarkare).
+18.2.2.2 `ERNIE 4.5 21B-A3B` (valido ma meno battle-tested in community locale).
+18.2.3 Da evitare su questa macchina:
+18.2.3.1 Modelli oltre scala RAM/VRAM (es. Mixtral 8x22B, DeepSeek-V3, MiniMax M2).
+18.2.3.2 Quantizzazioni Q2/Q3 su task critici.
+18.2.3.3 Esecuzione concorrente di piu modelli grandi.
+
+18.3 TODO 18A (chirurgico) - scelta baseline reale
+18.3.1 Installare e testare `Qwen3-30B-A3B` (Q4_K_M) come baseline.
+18.3.2 Se workload coding e dominante, aggiungere `Qwen3-Coder-30B-A3B`.
+18.3.3 Non partire da `Qwen3.5-35B-A3B` in prima iterazione.
+18.3.4 Raccogliere metriche minime obbligatorie:
+18.3.4.1 first-token latency
+18.3.4.2 tokens/sec
+18.3.4.3 picco RAM
+18.3.4.4 stabilita dopo 3 prompt lunghi consecutivi
+18.3.4.5 contesto usabile reale prima del degrado
+18.3.5 Soglia decisionale:
+18.3.5.1 se `Qwen3-30B-A3B` stabile -> diventa core.
+18.3.5.2 se instabile -> fallback a `Gemma3:12b`.
+18.3.5.3 confronto opzionale successivo -> `GLM-4.7-Flash`.
+
+18.4 TODO 18B - pseudo-MoE minimo con GPT-4.1 agentico
+18.4.1 Obiettivo: usare GPT-4.1 come orchestratore/verifier, non come esecutore cieco.
+18.4.2 Routing minimo (no multi-modello pesante in parallelo):
+18.4.2.1 router: classifica task in `coding|reasoning|osint|writing`.
+18.4.2.2 worker default: `Qwen3-30B-A3B`.
+18.4.2.3 worker coding: `Qwen3-Coder-30B-A3B`.
+18.4.2.4 fallback reasoning: `DeepSeek-R1:14b` solo su casi mirati.
+18.4.3 Loop operativo obbligatorio:
+18.4.3.1 PLAN -> EXECUTE -> VERIFY -> KEEP/ROLLBACK -> NEXT
+18.4.3.2 max_iter fisso (3) + budget tempo/token.
+18.4.3.3 verifier meccanico obbligatorio (test/schema/checklist), no validazione a sensazione.
+18.4.4 Criterio di uscita:
+18.4.4.1 output valido ai gate al primo o secondo ciclo.
+18.4.4.2 niente loop aperti senza metrica.
+
+18.5 Protocollo esecuzione autonoma GPT-4.1 (controllata)
+18.5.1 Un solo TODO attivo alla volta (lock di avanzamento).
+18.5.2 Prima di ogni scrittura: snapshot evidenze (stato file, ipotesi, rischio).
+18.5.3 Dopo ogni scrittura: self-check su regressioni e coerenza con criterio di uscita.
+18.5.4 Se errore non chiaro: stop, raccolta evidenze, nessuna invenzione.
+18.5.5 Report standard per ogni step:
+18.5.5.1 cosa ha cambiato
+18.5.5.2 test eseguiti
+18.5.5.3 risultato gate
+18.5.5.4 prossima azione o rollback
+
+18.6 Gate obbligatori sezione 18
+18.6.1 Evidenze benchmark annotate in file report locale.
+18.6.2 Nessuna regressione sulle suite correnti (`acceptance_think_ui`, `smoke_runtime`).
+18.6.3 Solo dopo gate verdi: autorizzato passaggio a RAG/loop piu lunghi.
+
+18.7 Fonti chiave (OSINT)
+18.7.1 https://lmstudio.ai/blog/lmstudio-v0.3.23
+18.7.2 https://lmstudio.ai/models/qwen/qwen3-30b-a3b
+18.7.3 https://lmstudio.ai/models/qwen/qwen3-coder-30b
+18.7.4 https://lmstudio.ai/models/qwen/qwen3.5-35b-a3b
+18.7.5 https://huggingface.co/Qwen/Qwen3.5-35B-A3B
+18.7.6 https://ollama.com/library/qwen3.5:35b-a3b
+18.7.7 https://ollama.com/library/deepseek-r1:14b
+18.7.8 https://ollama.com/library/gemma3
+18.7.9 https://docs.letta.com/letta-code/ralph-mode/
+

@@ -1,0 +1,2558 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Local Router Chat</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f3f3ef;
+      --panel: #fffdf8;
+      --line: #d8d6cc;
+      --ink: #111212;
+      --muted: #5e625f;
+      --accent: #1d7a58;
+      --accent-ink: #ecfff7;
+      --warn: #a33f22;
+      --user-bubble: #e7f4ee;
+      --assistant-bubble: #ffffff;
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+      --radius: 14px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      background:
+        radial-gradient(circle at 2% 0%, #d4ece1 0%, transparent 28%),
+        radial-gradient(circle at 98% 100%, #ffe2bf 0%, transparent 26%),
+        var(--bg);
+      color: var(--ink);
+      font-family: "Space Grotesk", sans-serif;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      height: 100vh;
+      gap: 12px;
+      padding: 12px;
+    }
+
+    .sidebar {
+      background: linear-gradient(180deg, #fffef9, #f8f4e9);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      position: sticky;
+      top: 12px;
+      height: calc(100vh - 24px);
+      align-self: start;
+    }
+
+    .side-head {
+      padding: 14px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .brand {
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      font-size: 15px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .agent-selector {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .agent-selector select {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      font-family: inherit;
+      font-size: 13px;
+      color: var(--ink);
+      cursor: pointer;
+    }
+
+    .agent-selector select:hover {
+      border-color: var(--accent);
+    }
+
+    .sessions {
+      overflow: auto;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .session-item {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 10px;
+      padding: 8px 10px;
+      cursor: pointer;
+      transition: transform .15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .session-item:hover { transform: translateY(-1px); }
+    .session-item.active { border-color: #2a8160; background: #effaf4; }
+
+    .session-title {
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .session-main {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .session-delete {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--warn);
+      border-radius: 999px;
+      width: 22px;
+      height: 22px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      cursor: pointer;
+      padding: 0;
+      line-height: 1;
+      flex: 0 0 auto;
+    }
+
+    .session-meta {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .main {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-width: 0;
+      position: sticky;
+      top: 12px;
+      height: calc(100vh - 24px);
+      align-self: start;
+      overflow: hidden;
+    }
+
+    .topbar {
+      border-bottom: 1px solid var(--line);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: var(--panel);
+    }
+
+    .top-title {
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      font-size: 15px;
+    }
+
+    .pill {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      background: #fff;
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .field label {
+      font-size: 12px;
+      color: var(--muted);
+      font-family: "IBM Plex Mono", monospace;
+    }
+
+    .field input:not([type="checkbox"]),
+    .field textarea {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 10px;
+      background: #fff;
+      color: var(--ink);
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+    }
+
+    .field textarea {
+      min-height: 66px;
+      max-height: 120px;
+      resize: vertical;
+    }
+
+    .field input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent);
+    }
+
+    select, input[type="number"] {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      background: #fff;
+      color: var(--ink);
+    }
+
+    .feed {
+      overflow: auto;
+      min-height: 0;
+      padding: 16px;
+      padding-bottom: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .jump-latest {
+      position: absolute;
+      right: 14px;
+      bottom: 94px;
+      border: 1px solid #1a6f50;
+      background: rgba(232, 247, 239, 0.95);
+      color: #1f6b45;
+      border-radius: 999px;
+      padding: 6px 10px;
+      min-height: 30px;
+      font-size: 11px;
+      letter-spacing: 0.01em;
+      font-family: "IBM Plex Mono", monospace;
+      cursor: pointer;
+      z-index: 8;
+      box-shadow: var(--shadow);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: opacity .15s ease, transform .15s ease;
+    }
+
+    .jump-latest.hidden {
+      display: none;
+    }
+
+    .jump-latest:hover {
+      transform: translateY(-1px);
+      background: #e3f4ec;
+    }
+
+    .msg {
+      width: min(900px, 92%);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px;
+      animation: rise .2s ease;
+    }
+
+    .feed > .msg:last-child {
+      margin-bottom: 14px;
+    }
+
+    .msg.user {
+      margin-left: auto;
+      background: var(--user-bubble);
+    }
+
+    .msg.assistant {
+      background: var(--assistant-bubble);
+    }
+
+    .msg-meta {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      font-family: "IBM Plex Mono", monospace;
+    }
+
+    .meta-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .meta-core {
+      color: var(--muted);
+    }
+
+    .meta-badge {
+      border: 1px solid transparent;
+      border-radius: 999px;
+      padding: 2px 7px;
+      font-size: 10px;
+      line-height: 1.2;
+      letter-spacing: 0.01em;
+      background: #f4f4f0;
+      color: #4e5352;
+    }
+
+    .meta-badge.think-enabled {
+      background: #e8f7ef;
+      border-color: #b3ddc6;
+      color: #1f6b45;
+    }
+
+    .meta-badge.think-downgraded {
+      background: #fff4de;
+      border-color: #e8c88f;
+      color: #7a5314;
+    }
+
+    .meta-badge.think-unsupported {
+      background: #ffe9de;
+      border-color: #e6b39a;
+      color: #7e3621;
+    }
+
+    .meta-badge.think-unavailable {
+      background: #eff1f3;
+      border-color: #d1d6db;
+      color: #56606a;
+    }
+
+    .meta-badge.meta-warn {
+      background: #fff7ea;
+      border-color: #d7cab4;
+      color: #6a4a1b;
+    }
+
+    .msg-content {
+      font-size: 14px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .msg-warnings {
+      margin-top: 8px;
+      padding: 8px 10px;
+      border: 1px dashed #d7cab4;
+      background: #fff7ea;
+      border-radius: 10px;
+      font-size: 12px;
+      line-height: 1.4;
+      color: #6a4a1b;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: "IBM Plex Mono", monospace;
+    }
+
+    .msg-thinking {
+      font-size: 12px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #5f6463;
+      border-left: 2px solid #d7ddd9;
+      padding-left: 8px;
+      margin-bottom: 8px;
+      font-family: "IBM Plex Mono", monospace;
+    }
+
+    .msg-empty {
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .msg-pending {
+      color: var(--muted);
+      font-style: italic;
+      opacity: 0.9;
+    }
+
+    .msg.user .msg-content {
+      cursor: pointer;
+    }
+
+    .msg-actions {
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+    }
+
+    .mini-btn {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      border-radius: 999px;
+      font-size: 11px;
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      cursor: pointer;
+      font-family: "IBM Plex Mono", monospace;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .msg-edit-box {
+      width: 100%;
+      min-height: 78px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      resize: vertical;
+      background: #fff;
+    }
+
+    .msg-edit-actions {
+      margin-top: 8px;
+      display: flex;
+      gap: 8px;
+    }
+
+    .msg.pending-edit-lock .msg-content {
+      pointer-events: none;
+      cursor: default;
+      opacity: 0.95;
+    }
+
+    .composer {
+      padding: 0 12px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: linear-gradient(180deg, #fffefc, #fff7ef);
+      border-bottom-left-radius: var(--radius);
+      border-bottom-right-radius: var(--radius);
+      position: sticky;
+      bottom: 0;
+      z-index: 6;
+    }
+
+    .composer::before {
+      content: none;
+    }
+
+    .composer-toolbar {
+      display: none;
+    }
+
+    .attach-anchor {
+      position: relative;
+    }
+
+    .attach-inline-btn {
+      width: 32px;
+      height: 32px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--muted);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      line-height: 1;
+      padding: 0;
+    }
+
+    .attach-inline-btn:hover {
+      border-color: #bcb8aa;
+      color: var(--ink);
+    }
+
+    .attach-menu {
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 0;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      box-shadow: var(--shadow);
+      min-width: 220px;
+      padding: 6px;
+      display: grid;
+      gap: 4px;
+      z-index: 20;
+    }
+
+    .attach-menu.hidden {
+      display: none;
+    }
+
+    .attach-menu button {
+      border: 1px solid transparent;
+      border-radius: 8px;
+      padding: 8px;
+      text-align: left;
+      background: #fff;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 13px;
+    }
+
+    .attach-menu button:hover {
+      border-color: var(--line);
+      background: #f9f8f3;
+    }
+
+    .input-row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      align-items: end;
+      position: relative;
+    }
+
+    .input-row::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: -10px;
+      height: 10px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(248, 248, 248, 0.52) 68%, rgba(248, 248, 248, 0.8));
+      pointer-events: none;
+    }
+
+    .input-shell {
+      border: 1px solid #cfcfcf;
+      border-radius: 20px;
+      background: #f8f8f8;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04), inset 0 0 0 1px rgba(255, 255, 255, 0.65);
+      position: relative;
+    }
+
+    .input-shell:focus-within {
+      border-color: #82ad99;
+      box-shadow: 0 0 0 2px rgba(29, 122, 88, 0.12);
+    }
+
+    .inbox-config {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding: 0;
+    }
+
+    .inbox-config .pill {
+      padding: 5px 10px;
+    }
+
+    .inbox-config select {
+      max-width: 100%;
+      height: 34px;
+      padding: 6px 10px;
+      border-radius: 10px;
+      font-size: 12px;
+    }
+
+    #modelSel {
+      width: clamp(260px, 36vw, 520px);
+    }
+
+    #thinkSel {
+      width: 128px;
+    }
+
+    .left-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      min-width: 0;
+    }
+
+    .attachments {
+      min-height: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .attachments:empty {
+      display: none;
+    }
+
+    .chip {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-family: "IBM Plex Mono", monospace;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .chip button {
+      border: none;
+      background: transparent;
+      color: var(--warn);
+      cursor: pointer;
+      font-size: 12px;
+      padding: 0;
+      line-height: 1;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 56px;
+      max-height: 180px;
+      resize: vertical;
+      border: none;
+      border-radius: 12px;
+      padding: 6px 8px;
+      font-family: inherit;
+      font-size: 14px;
+      outline: none;
+      background: transparent;
+    }
+
+    textarea:focus { border-color: transparent; }
+
+    .input-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 10px;
+      padding-top: 2px;
+      flex-wrap: wrap;
+    }
+
+    #sendBtn {
+      padding: 9px 14px;
+      min-width: 72px;
+      border-radius: 12px;
+      height: 34px;
+    }
+
+    .btn.stop {
+      background: #2c2f2d;
+      color: #fff;
+      border-color: #2c2f2d;
+      min-width: 64px;
+    }
+
+    .status {
+      font-size: 12px;
+      color: var(--muted);
+      min-height: 16px;
+      font-family: "IBM Plex Mono", monospace;
+    }
+
+    .status.error { color: var(--warn); }
+
+    .modal.hidden {
+      display: none;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.35);
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .modal-panel {
+      width: min(860px, 100%);
+      max-height: 90vh;
+      overflow: auto;
+      background: #fffdf8;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .modal-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .modal-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(220px, 1fr));
+      gap: 10px;
+    }
+
+    .modal-foot {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .msg { max-width: 100%; }
+      .input-row { grid-template-columns: 1fr; }
+      .inbox-config { gap: 6px; }
+      .inbox-config select { flex: 1 1 180px; }
+      #modelSel { width: 100%; }
+      #thinkSel { width: 100%; }
+      .left-controls { width: 100%; }
+      .modal-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="side-head">
+        <div class="brand">Local Router Console</div>
+        <button id="newChatBtn" class="btn">Nuova</button>
+      </div>
+      <div class="agent-selector">
+        <select id="agentSel">
+          <option value="">Agente...</option>
+        </select>
+      </div>
+      <div id="sessions" class="sessions"></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="top-title">Local Router Chat</div>
+        <div class="top-actions">
+          <button id="settingsBtn" class="btn">Impostazioni</button>
+        </div>
+      </header>
+
+      <section id="feed" class="feed"></section>
+      <button id="jumpToLatestBtn" class="jump-latest hidden" type="button" title="Vai all'ultimo messaggio">↓</button>
+
+      <footer class="composer">
+        <input id="fileInput" type="file" multiple hidden />
+        <input id="folderInput" type="file" webkitdirectory directory hidden />
+        <div id="attachmentsBar" class="attachments"></div>
+        <div class="input-row">
+          <div class="input-shell">
+            <textarea id="promptInput" placeholder="Scrivi qui. Invio = manda, Shift+Invio = nuova riga"></textarea>
+            <div class="input-actions">
+              <div class="left-controls">
+                <div class="attach-anchor">
+                  <button id="attachBtn" class="attach-inline-btn" title="Allega" aria-label="Allega">+</button>
+                  <div id="attachMenu" class="attach-menu hidden">
+                    <button id="attachFilesAction">Carica file...</button>
+                    <button id="attachFolderAction">Carica cartella...</button>
+                    <button id="workspaceToolsAction">Strumenti cartella/file...</button>
+                  </div>
+                </div>
+                <div class="inbox-config">
+                  <select id="modelSel"></select>
+                  <label class="pill" for="thinkSel">think</label>
+                  <select id="thinkSel">
+                    <option value="">auto</option>
+                    <option value="high">deep</option>
+                    <option value="medium">conversation</option>
+                    <option value="low">fast</option>
+                  </select>
+                  <button id="sendBtn" class="btn primary">Invia</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="status" class="status"></div>
+      </footer>
+    </main>
+  </div>
+
+  <div id="settingsModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Impostazioni">
+    <section class="modal-panel">
+      <div class="modal-head">
+        <strong>Impostazioni globali e guard rail</strong>
+        <button id="closeSettingsBtn" class="btn">Chiudi</button>
+      </div>
+      <div class="modal-grid">
+        <div class="field">
+          <label for="profileSel">profilo</label>
+          <select id="profileSel"></select>
+        </div>
+        <div class="field">
+          <label for="maxTok">max_tokens</label>
+          <input id="maxTok" type="number" min="1" max="8192" value="2048" />
+        </div>
+        <div class="field">
+          <label for="confirmBox">conferma azioni irreversibili</label>
+          <input id="confirmBox" type="checkbox" />
+        </div>
+        <div class="field">
+          <label for="systemPromptInput">istruzioni globali (system prompt)</label>
+          <textarea id="systemPromptInput" placeholder="Istruzioni globali per il modello..."></textarea>
+        </div>
+        <div class="field">
+          <label for="persistPromptBox">salva system prompt anche nel codice</label>
+          <input id="persistPromptBox" type="checkbox" />
+        </div>
+        <div class="field">
+          <label for="dirsInput">allowed directories (separate da virgola)</label>
+          <input id="dirsInput" type="text" placeholder="C:/repo/src, C:/repo/docs" />
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button id="saveSettingsBtn" class="btn primary">Salva</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="fileToolsModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Strumenti file">
+    <section class="modal-panel">
+      <div class="modal-head">
+        <strong>Strumenti cartella e file</strong>
+        <button id="closeFileToolsBtn" class="btn">Chiudi</button>
+      </div>
+      <div class="modal-grid">
+        <div class="field">
+          <label for="browsePathInput">sfoglia cartella</label>
+          <input id="browsePathInput" type="text" value="." />
+          <button id="browsePathBtn" class="btn">Mostra contenuto</button>
+          <textarea id="browseResult" readonly placeholder="Risultati cartella..."></textarea>
+        </div>
+        <div class="field">
+          <label for="createFilePathInput">crea file (path relativo)</label>
+          <input id="createFilePathInput" type="text" placeholder="notes/nuovo.txt" />
+          <textarea id="createFileContentInput" placeholder="Contenuto file..."></textarea>
+          <button id="createFileBtn" class="btn">Crea file</button>
+        </div>
+        <div class="field">
+          <label for="copySourceInput">copia file - sorgente</label>
+          <input id="copySourceInput" type="text" placeholder="notes/a.txt" />
+          <label for="copyDestInput">copia file - destinazione</label>
+          <input id="copyDestInput" type="text" placeholder="notes/b.txt" />
+          <button id="copyFileBtn" class="btn">Copia file</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+      // --- 7.5.7: Restore helper and regression self-test ---
+      function restoreToCheckpoint(session, messageId, setStatusCb) {
+        let result = { mutated: false, error: null };
+        const s = session;
+        const m = s.messages.find(x => x.id === messageId);
+        if (!m) { result.error = "msg_not_found"; return result; }
+        const idx = s.messages.findIndex(x => x.id === m.id);
+        if (
+          idx < 0 ||
+          !m.checkpoint_id ||
+          !Array.isArray(s.checkpoints) ||
+          !s.checkpoints.length
+        ) {
+          if (setStatusCb) setStatusCb("Checkpoint incoerente: ripristino annullato.", true);
+          result.error = "checkpoint_meta"; return result;
+        }
+        const checkpoint = s.checkpoints.find(c => c.checkpoint_id === m.checkpoint_id);
+        if (!checkpoint) {
+          if (setStatusCb) setStatusCb("Checkpoint incoerente: ripristino annullato.", true);
+          result.error = "checkpoint_missing"; return result;
+        }
+        if (
+          (checkpoint.branch_id && m.branch_id && checkpoint.branch_id !== m.branch_id)
+        ) {
+          if (setStatusCb) setStatusCb("Checkpoint incoerente: ripristino annullato.", true);
+          result.error = "branch_mismatch"; return result;
+        }
+        s.messages.splice(idx + 1);
+        if (m.branch_id) s.active_branch_id = m.branch_id;
+        insertAssistantEvent(
+          s,
+          idx + 1,
+          "Ripristino timeline al checkpoint selezionato.",
+          "system",
+          "checkpoint_restore",
+          {
+            checkpoint_id: m.checkpoint_id || null,
+            branch_id: m.branch_id || null,
+            parent_message_id: m.parent_message_id || null,
+            at: m.at || null
+          }
+        );
+        s.updatedAt = now();
+        result.mutated = true;
+        return result;
+      }
+
+      // --- 7.5.7: Regression self-test ---
+      function regression_restoreToCheckpoint() {
+        let pass = true;
+        // Caso 1: valido
+        let s1 = {
+          messages: [
+            {id: "u1", role: "user", text: "A", checkpoint_id: "c1", branch_id: "b1", parent_message_id: null, at: 1},
+            {id: "a1", role: "assistant", text: "B", at: 2},
+            {id: "u2", role: "user", text: "C", at: 3}
+          ],
+          checkpoints: [{checkpoint_id: "c1", branch_id: "b1"}],
+          active_branch_id: null
+        };
+        let r1 = restoreToCheckpoint(s1, "u1");
+        pass = pass && r1.mutated && s1.messages.length === 2 && s1.active_branch_id === "b1" && s1.messages[1].intent === "checkpoint_restore";
+
+        // Caso 2: checkpoint incoerente
+        let s2 = {
+          messages: [
+            {id: "u1", role: "user", text: "A", checkpoint_id: "cX", branch_id: "b1", parent_message_id: null, at: 1},
+            {id: "a1", role: "assistant", text: "B", at: 2}
+          ],
+          checkpoints: [{checkpoint_id: "c1", branch_id: "b1"}],
+          active_branch_id: null
+        };
+        let r2 = restoreToCheckpoint(s2, "u1");
+        pass = pass && !r2.mutated && r2.error && s2.messages.length === 2;
+
+        // Caso 3: restore + nuova risposta
+        let s3 = {
+          messages: [
+            {id: "u1", role: "user", text: "A", checkpoint_id: "c1", branch_id: "b1", parent_message_id: null, at: 1},
+            {id: "a1", role: "assistant", text: "B", at: 2},
+            {id: "u2", role: "user", text: "C", at: 3}
+          ],
+          checkpoints: [{checkpoint_id: "c1", branch_id: "b1"}],
+          active_branch_id: null
+        };
+        let r3 = restoreToCheckpoint(s3, "u1");
+        s3.messages.push({id: "a2", role: "assistant", text: "D", at: 4});
+        pass = pass && r3.mutated && s3.messages.length === 3 && s3.messages[1].role === "assistant" && s3.messages[1].intent === "checkpoint_restore";
+
+        // Output
+        if (typeof console !== "undefined") {
+          if (pass) {
+            console.log("[regression_restoreToCheckpoint] PASS");
+          } else {
+            console.error("[regression_restoreToCheckpoint] FAIL");
+          }
+        }
+        return pass;
+      }
+    const API = (window.__API_BASE__ && String(window.__API_BASE__).trim()) || window.location.origin;
+    const USE_SERVER_STORAGE = true; // toggle: true=server, false=localStorage legacy
+    const sessionsEl = document.getElementById("sessions");
+    const feedEl = document.getElementById("feed");
+    const jumpToLatestBtn = document.getElementById("jumpToLatestBtn");
+    const modelSel = document.getElementById("modelSel");
+    const maxTok = document.getElementById("maxTok");
+    const profileSel = document.getElementById("profileSel");
+    const thinkSel = document.getElementById("thinkSel");
+    const confirmBox = document.getElementById("confirmBox");
+    const persistPromptBox = document.getElementById("persistPromptBox");
+    const settingsBtn = document.getElementById("settingsBtn");
+    const closeSettingsBtn = document.getElementById("closeSettingsBtn");
+    const saveSettingsBtn = document.getElementById("saveSettingsBtn");
+    const settingsModal = document.getElementById("settingsModal");
+    const attachBtn = document.getElementById("attachBtn");
+    const attachMenu = document.getElementById("attachMenu");
+    const attachFilesAction = document.getElementById("attachFilesAction");
+    const attachFolderAction = document.getElementById("attachFolderAction");
+    const workspaceToolsAction = document.getElementById("workspaceToolsAction");
+    const fileInput = document.getElementById("fileInput");
+    const folderInput = document.getElementById("folderInput");
+    const attachmentsBar = document.getElementById("attachmentsBar");
+    const fileToolsModal = document.getElementById("fileToolsModal");
+    const closeFileToolsBtn = document.getElementById("closeFileToolsBtn");
+    const browsePathInput = document.getElementById("browsePathInput");
+    const browsePathBtn = document.getElementById("browsePathBtn");
+    const browseResult = document.getElementById("browseResult");
+    const createFilePathInput = document.getElementById("createFilePathInput");
+    const createFileContentInput = document.getElementById("createFileContentInput");
+    const createFileBtn = document.getElementById("createFileBtn");
+    const copySourceInput = document.getElementById("copySourceInput");
+    const copyDestInput = document.getElementById("copyDestInput");
+    const copyFileBtn = document.getElementById("copyFileBtn");
+    const promptInput = document.getElementById("promptInput");
+    const systemPromptInput = document.getElementById("systemPromptInput");
+    const dirsInput = document.getElementById("dirsInput");
+    const statusEl = document.getElementById("status");
+    const sendBtn = document.getElementById("sendBtn");
+    const newChatBtn = document.getElementById("newChatBtn");
+    const agentSel = document.getElementById("agentSel");
+
+    const STORE_KEY = "local_router_sessions_v1";
+    let sessions = [];
+    let currentId = null;
+    let sending = false;
+    let activeRequestController = null;
+    let editingMessageId = null;
+    let editDraftText = "";
+    let editSubmittingMessageId = null;
+    let attachments = [];
+    let autoScrollEnabled = true;
+    let serverSessionId = null; // session_id from server
+
+    const now = () => new Date().toISOString();
+
+    async function syncToServer() {
+      if (!USE_SERVER_STORAGE) return { synced: false, reason: "disabled" };
+      try {
+        const r = await fetch(`${API}/api/chat`, { method: "GET" });
+        if (!r.ok) return { synced: false, reason: "server_error" };
+        const data = await r.json();
+        if (data.sessions && data.sessions.length > 0) {
+          return { synced: true, sessions: data.sessions };
+        }
+        return { synced: true, sessions: [] };
+      } catch (e) {
+        return { synced: false, reason: "network_error" };
+      }
+    }
+
+    async function createServerSession(title) {
+      if (!USE_SERVER_STORAGE) return null;
+      try {
+        const r = await fetch(`${API}/api/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title }),
+        });
+        if (!r.ok) return null;
+        return await r.json();
+      } catch (e) {
+        return null;
+      }
+    }
+
+    async function saveToServer(session) {
+      if (!USE_SERVER_STORAGE || !serverSessionId) return false;
+      try {
+        const r = await fetch(`${API}/api/chat/${serverSessionId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: session.title, active_branch_id: session.active_branch_id, branch_seq: session.branch_seq }),
+        });
+        return r.ok;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    async function saveMessageToServer(sessionId, message) {
+      if (!USE_SERVER_STORAGE) return null;
+      try {
+        const r = await fetch(`${API}/api/chat/${sessionId}/messages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(message),
+        });
+        if (!r.ok) return null;
+        return await r.json();
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function getRoutingSelection() {
+      if (modelSel.value === "auto") {
+        return { mode: "auto", model: null };
+      }
+      return { mode: "manual", model: modelSel.value || null };
+    }
+
+    async function loadSessions() {
+      if (USE_SERVER_STORAGE) {
+        try {
+          const sync = await syncToServer();
+          if (sync.synced && sync.sessions && sync.sessions.length > 0) {
+            for (const s of sync.sessions) {
+              try {
+                const r = await fetch(`${API}/api/chat/${s.id}/messages`);
+                if (r.ok) {
+                  const data = await r.json();
+                  s.messages = data.messages || [];
+                } else {
+                  s.messages = [];
+                }
+              } catch {
+                s.messages = [];
+              }
+            }
+            sessions = sync.sessions.map(s => ({
+              ...s,
+              messages: s.messages || [],
+              checkpoints: s.checkpoints || [],
+            }));
+            sessions = sessions.map(normalizeSessionSchema);
+            currentId = sessions[0]?.id || null;
+            serverSessionId = currentId;
+            autoScrollEnabled = true;
+            hideUnreadIndicator();
+            renderSessions();
+            renderFeed(true, true);
+            return;
+          }
+        } catch (e) {
+          console.warn("Server sync failed, falling back to localStorage", e);
+        }
+      }
+      try {
+        sessions = JSON.parse(localStorage.getItem(STORE_KEY) || "[]");
+      } catch {
+        sessions = [];
+      }
+      sessions = sessions.map(normalizeSessionSchema);
+      if (!sessions.length) {
+        await createSession("Nuova chat");
+      }
+      if (!currentId || !sessions.some(s => s.id === currentId)) {
+        currentId = sessions[0].id;
+      }
+      const currentSession = sessions.find(s => s.id === currentId);
+      if (currentSession && currentSession.agent) {
+        agentSel.value = currentSession.agent;
+      }
+      autoScrollEnabled = true;
+      hideUnreadIndicator();
+    }
+
+    function saveSessions() {
+      localStorage.setItem(STORE_KEY, JSON.stringify(sessions));
+      if (USE_SERVER_STORAGE && serverSessionId) {
+        const s = currentSession();
+        if (s && serverSessionId === s.id) {
+          saveToServer(s).catch(() => {});
+        }
+      }
+    }
+
+    async function createSession(title = "Nuova chat") {
+      let serverId = null;
+      if (USE_SERVER_STORAGE) {
+        try {
+          const serverSession = await createServerSession(title);
+          if (serverSession) {
+            serverId = serverSession.id;
+          }
+        } catch (e) {
+          console.warn("Server create failed, using local-only session");
+        }
+      }
+      const s = {
+        id: serverId || crypto.randomUUID(),
+        title,
+        agent: agentSel.value || null,
+        createdAt: now(),
+        updatedAt: now(),
+        active_branch_id: null,
+        branch_seq: 0,
+        checkpoints: [],
+        messages: []
+      };
+      sessions.unshift(s);
+      currentId = s.id;
+      if (serverId) serverSessionId = serverId;
+      autoScrollEnabled = true;
+      hideUnreadIndicator();
+      saveSessions();
+      renderSessions();
+      renderFeed(true, true);
+      return s;
+    }
+
+    function isFeedNearBottom() {
+      const distance = feedEl.scrollHeight - (feedEl.scrollTop + feedEl.clientHeight);
+      return distance <= 16;
+    }
+
+    function hideUnreadIndicator() {
+      jumpToLatestBtn.classList.add("hidden");
+      jumpToLatestBtn.textContent = "↓";
+    }
+
+    function showUnreadIndicator() {
+      jumpToLatestBtn.textContent = "↓";
+      jumpToLatestBtn.classList.remove("hidden");
+    }
+
+    function applyAutoScroll({ force = false, incoming = false, wasNearBottom = null } = {}) {
+      const nearBottomBeforeUpdate = wasNearBottom === true;
+      if (force || autoScrollEnabled || (incoming && nearBottomBeforeUpdate)) {
+        feedEl.scrollTop = feedEl.scrollHeight;
+        autoScrollEnabled = true;
+        hideUnreadIndicator();
+        return;
+      }
+      if (incoming) {
+        showUnreadIndicator();
+      }
+    }
+
+    function currentSession() {
+      return sessions.find(s => s.id === currentId);
+    }
+
+    function normalizeMessageSchema(message) {
+      if (!message || typeof message !== "object") {
+        return message;
+      }
+      if (!message.id) {
+        message.id = crypto.randomUUID();
+      }
+      if (typeof message.created_at !== "string" || !message.created_at) {
+        message.created_at = message.at || now();
+      }
+      if (!Object.prototype.hasOwnProperty.call(message, "checkpoint_id")) {
+        message.checkpoint_id = null;
+      }
+      if (!Object.prototype.hasOwnProperty.call(message, "parent_message_id")) {
+        message.parent_message_id = null;
+      }
+      if (!Object.prototype.hasOwnProperty.call(message, "branch_id")) {
+        message.branch_id = null;
+      }
+      return message;
+    }
+
+    function normalizeSessionSchema(session) {
+      if (!session || typeof session !== "object") {
+        return session;
+      }
+      if (!Array.isArray(session.messages)) {
+        session.messages = [];
+      }
+      session.messages = session.messages.map(normalizeMessageSchema);
+      if (!Array.isArray(session.checkpoints)) {
+        session.checkpoints = [];
+      }
+      if (typeof session.branch_seq !== "number" || Number.isNaN(session.branch_seq)) {
+        session.branch_seq = 0;
+      }
+      if (!Object.prototype.hasOwnProperty.call(session, "active_branch_id")) {
+        session.active_branch_id = null;
+      }
+      if (!Object.prototype.hasOwnProperty.call(session, "agent")) {
+        session.agent = null;
+      }
+      return session;
+    }
+
+    function renderSessions() {
+      sessionsEl.innerHTML = "";
+      for (const s of sessions) {
+        const item = document.createElement("div");
+        item.className = "session-item" + (s.id === currentId ? " active" : "");
+        item.innerHTML = `
+          <div class="session-main">
+            <div class="session-title">${escapeHtml(s.title)}</div>
+            <div class="session-meta">${new Date(s.updatedAt).toLocaleString()}</div>
+          </div>
+          <button class="session-delete" title="Elimina chat" aria-label="Elimina chat">✕</button>
+        `;
+
+        item.querySelector(".session-main").onclick = () => {
+          currentId = s.id;
+          agentSel.value = s.agent || "";
+          autoScrollEnabled = true;
+          hideUnreadIndicator();
+          renderSessions();
+          renderFeed(true, true);
+        };
+
+        item.querySelector(".session-delete").onclick = (e) => {
+          e.stopPropagation();
+          sessions = sessions.filter(x => x.id !== s.id);
+          if (!sessions.length) {
+            createSession("Nuova chat");
+            return;
+          }
+          if (currentId === s.id) {
+            currentId = sessions[0].id;
+          }
+          autoScrollEnabled = true;
+          hideUnreadIndicator();
+          saveSessions();
+          renderSessions();
+          renderFeed(true, true);
+          setStatus("chat eliminata");
+        };
+
+        sessionsEl.appendChild(item);
+      }
+    }
+
+    function setSendingState(isSending) {
+      sending = isSending;
+      sendBtn.disabled = false;
+      if (isSending) {
+        sendBtn.textContent = "■";
+        sendBtn.classList.remove("primary");
+        sendBtn.classList.add("stop");
+      } else {
+        sendBtn.textContent = "Invia";
+        sendBtn.classList.remove("stop");
+        sendBtn.classList.add("primary");
+      }
+    }
+
+    function renderFeed(persist = true, forceScroll = false) {
+      const wasNearBottom = isFeedNearBottom();
+      feedEl.innerHTML = "";
+      const s = currentSession();
+      if (!s) return;
+
+      for (const m of s.messages) {
+        normalizeMessageSchema(m);
+        const node = document.createElement("article");
+        node.className = `msg ${m.role}`;
+        node.dataset.msgId = m.id;
+        const isUserPendingEdit = m.role === "user" && editSubmittingMessageId === m.id;
+        if (isUserPendingEdit) {
+          node.classList.add("pending-edit-lock");
+        }
+        const metaNode = document.createElement("div");
+        metaNode.className = "msg-meta";
+        metaNode.dataset.role = "meta";
+        renderMessageMeta(metaNode, m);
+        node.appendChild(metaNode);
+
+        if (m.role === "user" && editingMessageId === m.id) {
+          const editBox = document.createElement("textarea");
+          editBox.className = "msg-edit-box";
+          editBox.value = editDraftText;
+          editBox.oninput = (e) => {
+            editDraftText = e.target.value;
+          };
+          node.appendChild(editBox);
+
+          const editActions = document.createElement("div");
+          editActions.className = "msg-edit-actions";
+
+          const saveBtn = document.createElement("button");
+          saveBtn.className = "btn primary";
+          const isEditSubmitting = editSubmittingMessageId === m.id;
+          saveBtn.textContent = isEditSubmitting ? "Modifica inviata" : "Salva";
+          saveBtn.disabled = isEditSubmitting;
+          saveBtn.onclick = () => saveInlineEditMessage(m.id);
+
+          const cancelBtn = document.createElement("button");
+          cancelBtn.className = "btn";
+          cancelBtn.textContent = "Annulla";
+          cancelBtn.disabled = isEditSubmitting;
+          cancelBtn.onclick = () => clearEditMode();
+
+          editActions.appendChild(saveBtn);
+          editActions.appendChild(cancelBtn);
+          node.appendChild(editActions);
+        } else {
+          const thinkingText = normalizeThinkingText(m.thinking || "", { trim: !m.streaming });
+          if (thinkingText.trim()) {
+            const thinkingNode = document.createElement("div");
+            thinkingNode.className = "msg-thinking";
+            thinkingNode.dataset.role = "thinking";
+            thinkingNode.textContent = thinkingText;
+            node.appendChild(thinkingNode);
+          }
+
+          const contentNode = document.createElement("div");
+          contentNode.className = "msg-content";
+          contentNode.dataset.role = "content";
+          let contentText = m.text || "";
+          if (m.role === "assistant") {
+            const isStreaming = !!m.streaming;
+            contentText = normalizeAssistantText(contentText, { trim: !isStreaming });
+            if (!isStreaming && contentText !== m.text) {
+              m.text = contentText;
+            }
+            if (!contentText.trim()) {
+              if (isStreaming) {
+                contentNode.classList.add("msg-pending");
+                contentText = "[Generazione in corso...]";
+              } else {
+                contentNode.classList.add("msg-empty");
+                contentText = "[Nessun contenuto restituito dal modello]";
+              }
+            }
+          }
+          contentNode.textContent = contentText;
+          node.appendChild(contentNode);
+
+          const warningsText = formatWarningsText(m.warnings);
+          if (warningsText) {
+            const warnNode = document.createElement("div");
+            warnNode.className = "msg-warnings";
+            warnNode.dataset.role = "warnings";
+            warnNode.textContent = warningsText;
+            node.appendChild(warnNode);
+          }
+
+          if (m.role === "user") {
+            const actions = document.createElement("div");
+            actions.className = "msg-actions";
+            const editBtn = document.createElement("button");
+            editBtn.className = "mini-btn";
+            editBtn.innerHTML = "&#9998;";
+            editBtn.title = "Modifica messaggio";
+            editBtn.disabled = isUserPendingEdit;
+            editBtn.onclick = () => startEditMessage(m.id);
+
+            // 7.5.1: Bottone restore checkpoint (icona) se checkpoint_id presente
+            if (m.checkpoint_id) {
+              const restoreBtn = document.createElement("button");
+              restoreBtn.className = "mini-btn";
+              restoreBtn.innerHTML = "&#8630;";
+              restoreBtn.setAttribute("aria-label", "Torna a questo punto");
+              restoreBtn.title = "Ripristina la chat a questo checkpoint";
+              restoreBtn.disabled = isUserPendingEdit;
+              let restoreInProgress = false;
+              restoreBtn.onclick = async () => {
+                if (restoreInProgress) return;
+                restoreInProgress = true;
+                restoreBtn.disabled = true;
+                try {
+                  const res = restoreToCheckpoint(s, m.id, typeof setStatus === "function" ? setStatus : undefined);
+                  if (res.mutated) {
+                    saveSessions();
+                    renderSessions();
+                    renderFeed();
+                    if (typeof setStatus === "function") setStatus("Timeline ripristinata al checkpoint selezionato.");
+                  }
+                } finally {
+                  restoreInProgress = false;
+                  restoreBtn.disabled = false;
+                }
+              };
+              actions.appendChild(restoreBtn);
+            }
+            actions.appendChild(editBtn);
+            node.appendChild(actions);
+
+            if (!isUserPendingEdit) {
+              contentNode.onclick = () => startEditMessage(m.id);
+            }
+          }
+        }
+
+        feedEl.appendChild(node);
+      }
+
+      if (persist) {
+        saveSessions();
+      }
+      applyAutoScroll({ force: forceScroll, incoming: false, wasNearBottom });
+    }
+
+    function patchAssistantMessageNode(message) {
+      if (!message?.id) return false;
+      const wasNearBottom = isFeedNearBottom();
+      const node = feedEl.querySelector(`article[data-msg-id="${message.id}"]`);
+      if (!node) return false;
+
+      const metaNode = node.querySelector('[data-role="meta"]');
+      const contentNode = node.querySelector('[data-role="content"]');
+      if (!metaNode || !contentNode) return false;
+
+      const existingThinkingNode = node.querySelector('[data-role="thinking"]');
+      renderMessageMeta(metaNode, message);
+
+      const thinkingText = normalizeThinkingText(message.thinking || "", { trim: !message.streaming });
+      if (thinkingText.trim()) {
+        let thinkingNode = existingThinkingNode;
+        if (!thinkingNode) {
+          thinkingNode = document.createElement("div");
+          thinkingNode.className = "msg-thinking";
+          thinkingNode.dataset.role = "thinking";
+          node.insertBefore(thinkingNode, contentNode);
+        }
+        thinkingNode.textContent = thinkingText;
+      } else if (existingThinkingNode) {
+        existingThinkingNode.remove();
+      }
+
+      const isStreaming = !!message.streaming;
+      const normalized = normalizeAssistantText(message.text || "", { trim: !isStreaming });
+      contentNode.classList.remove("msg-empty", "msg-pending");
+
+      let textToShow = normalized;
+      if (!normalized.trim()) {
+        if (isStreaming) {
+          textToShow = "[Generazione in corso...]";
+          contentNode.classList.add("msg-pending");
+        } else {
+          textToShow = "[Nessun contenuto restituito dal modello]";
+          contentNode.classList.add("msg-empty");
+        }
+      }
+      contentNode.textContent = textToShow;
+
+      const existingWarningsNode = node.querySelector('[data-role="warnings"]');
+      const warningsText = formatWarningsText(message.warnings);
+      if (warningsText) {
+        let warnNode = existingWarningsNode;
+        if (!warnNode) {
+          warnNode = document.createElement("div");
+          warnNode.className = "msg-warnings";
+          warnNode.dataset.role = "warnings";
+          node.appendChild(warnNode);
+        }
+        warnNode.textContent = warningsText;
+      } else if (existingWarningsNode) {
+        existingWarningsNode.remove();
+      }
+
+      applyAutoScroll({ force: false, incoming: true, wasNearBottom });
+      return true;
+    }
+
+    // (removed duplicate thinkStatusBadge)
+
+    function messageMetaText(message) {
+      if (!message) {
+        return "-";
+      }
+      if (message.role !== "assistant") {
+        return "utente";
+      }
+      const parts = [`${message.model || "-"}`, `${message.intent || "-"}`];
+      return parts.join(" · ");
+    }
+
+    function renderMessageMeta(metaNode, message) {
+      metaNode.textContent = "";
+      if (!message || message.role !== "assistant") {
+        metaNode.textContent = `${messageMetaText(message)} · ${new Date(message?.at || now()).toLocaleTimeString()}`;
+        return;
+      }
+
+      const row = document.createElement("div");
+      row.className = "meta-row";
+
+      const core = document.createElement("span");
+      core.className = "meta-core";
+      core.textContent = `${messageMetaText(message)} · ${new Date(message.at).toLocaleTimeString()}`;
+      row.appendChild(core);
+
+      const thinkBadge = thinkStatusBadge(message);
+      if (thinkBadge) {
+        const badge = document.createElement("span");
+        badge.className = `meta-badge ${thinkBadge.className}`;
+        badge.textContent = thinkBadge.text;
+        badge.title = thinkBadge.title;
+        row.appendChild(badge);
+      }
+
+      const warningCount = Array.isArray(message.warnings) ? message.warnings.length : 0;
+      if (warningCount > 0) {
+        const warnBadge = document.createElement("span");
+        warnBadge.className = "meta-badge meta-warn";
+        warnBadge.textContent = `${warningCount} warning`;
+        warnBadge.title = "Warning non bloccanti durante generazione/retry";
+        row.appendChild(warnBadge);
+      }
+
+      metaNode.appendChild(row);
+    }
+
+    function formatWarningsText(value) {
+      if (!Array.isArray(value) || value.length === 0) {
+        return "";
+      }
+      const clean = value.map((x) => String(x || "").trim()).filter(Boolean);
+      if (!clean.length) {
+        return "";
+      }
+      return `[warnings]\n${clean.join("\n")}`;
+    }
+
+    function setStatus(text, isError = false) {
+      statusEl.textContent = text;
+      statusEl.className = "status" + (isError ? " error" : "");
+    }
+
+    // STEP B: Deterministic contract-driven UI (no semantic parsing)
+    function normalizeAssistantText(text, { trim = true } = {}) {
+      if (!text) return "";
+      // No tag or semantic parsing: just return as-is (optionally trimmed)
+      return trim ? String(text).trim() : String(text);
+    }
+
+    function normalizeThinkingText(thinking, { trim = true } = {}) {
+      // Only use explicit contract field (no tag or text parsing)
+      if (!thinking) return "";
+      return trim ? String(thinking).trim() : String(thinking);
+    }
+
+    // (splitThinkingFromText fully removed; contract is deterministic)
+
+    function buildCheckpointFromEdit(session, messageIdx, reason) {
+      normalizeSessionSchema(session);
+      const parent = session.messages[messageIdx];
+      if (!parent) {
+        return null;
+      }
+      normalizeMessageSchema(parent);
+      session.branch_seq += 1;
+      const checkpointId = crypto.randomUUID();
+      const branchId = `branch-${session.branch_seq}`;
+      const createdAt = now();
+      const truncatedCount = Math.max(0, session.messages.length - (messageIdx + 1));
+      const checkpoint = {
+        checkpoint_id: checkpointId,
+        parent_message_id: parent.id,
+        branch_id: branchId,
+        created_at: createdAt,
+        truncated_count: truncatedCount,
+        reason: reason || "edit"
+      };
+
+      session.messages.splice(messageIdx + 1);
+      parent.checkpoint_id = checkpointId;
+      parent.branch_id = branchId;
+      parent.parent_message_id = null;
+      parent.created_at = parent.created_at || createdAt;
+      session.active_branch_id = branchId;
+      session.checkpoints.push(checkpoint);
+      session.updatedAt = createdAt;
+      return checkpoint;
+    }
+
+    function insertAssistantEvent(session, index, text, model = "system", intent = "status", metadata = null) {
+      const createdAt = now();
+      const msg = normalizeMessageSchema({
+        id: crypto.randomUUID(),
+        role: "assistant",
+        text,
+        model,
+        intent,
+        at: createdAt,
+        created_at: createdAt,
+        checkpoint_id: metadata?.checkpoint_id || null,
+        parent_message_id: metadata?.parent_message_id || null,
+        branch_id: metadata?.branch_id || session.active_branch_id || null
+      });
+      session.messages.splice(index, 0, msg);
+      session.updatedAt = now();
+    }
+
+    function touchSessionTitle(prompt) {
+      const s = currentSession();
+      if (!s) return;
+      if (s.title === "Nuova chat" && prompt.trim()) {
+        s.title = prompt.trim().slice(0, 42);
+      }
+      s.updatedAt = now();
+    }
+
+    async function refreshModels() {
+      try {
+        const r = await fetch(`${API}/models`);
+        const data = await r.json();
+        const previousSelection = modelSel.value || "auto";
+        modelSel.innerHTML = "";
+
+        const autoOpt = document.createElement("option");
+        autoOpt.value = "auto";
+        autoOpt.textContent = "Auto";
+        modelSel.appendChild(autoOpt);
+
+        const embedModelPattern = /(embed|embedding|bge|e5|all-minilm|gte|nomic-embed|mxbai-embed)/i;
+        const chatCandidates = (data.models || []).filter((m) => !embedModelPattern.test(m));
+
+        for (const m of chatCandidates) {
+          const opt = document.createElement("option");
+          opt.value = m;
+          opt.textContent = m;
+          modelSel.appendChild(opt);
+        }
+
+        const hasPrevious = Array.from(modelSel.options).some((opt) => opt.value === previousSelection);
+        modelSel.value = hasPrevious ? previousSelection : "auto";
+      } catch {
+        setStatus("errore caricamento modelli", true);
+      }
+    }
+
+    function openSettings() {
+      settingsModal.classList.remove("hidden");
+    }
+
+    function closeSettings() {
+      settingsModal.classList.add("hidden");
+    }
+
+    function startEditMessage(messageId) {
+      const s = currentSession();
+      if (!s) return;
+      if (editSubmittingMessageId === messageId) return;
+      const msg = s.messages.find(x => x.id === messageId && x.role === "user");
+      if (!msg) return;
+      editingMessageId = messageId;
+      editDraftText = msg.text || "";
+      setStatus("Modifica inline attiva");
+      renderFeed();
+    }
+
+    function clearEditMode(shouldRender = true) {
+      editingMessageId = null;
+      editDraftText = "";
+      editSubmittingMessageId = null;
+      if (shouldRender) renderFeed();
+    }
+
+    function thinkStatusBadge(message) {
+      // Only use backend contract fields, never infer from text/tags
+      if (!message || message.role !== "assistant") {
+        return null;
+      }
+      const status = String(message.think_status || "").trim().toLowerCase();
+      // Safe fallback: if missing, show nothing
+      if (!status) {
+        return null;
+      }
+      if (status === "enabled") {
+        const suffix = message.think_applied ? ` (${message.think_applied})` : "";
+        return {
+          text: `thinking attivo${suffix}`,
+          className: "think-enabled",
+          title: "Reasoning esplicito disponibile in output",
+        };
+      }
+      if (status === "downgraded") {
+        return {
+          text: "thinking degradato",
+          className: "think-downgraded",
+          title: "Richiesto ma ridotto durante retry/fallback",
+        };
+      }
+      if (status === "unsupported") {
+        return {
+          text: "thinking non supportato",
+          className: "think-unsupported",
+          title: "Il modello ha rifiutato il parametro think",
+        };
+      }
+      if (status === "unavailable") {
+        return {
+          text: "thinking non richiesto",
+          className: "think-unavailable",
+          title: "Nessuna richiesta think per questo turno",
+        };
+      }
+      // Unknown status: show as custom, but never parse from text
+      return {
+        text: `thinking ${status}`,
+        className: "think-unavailable",
+        title: "Stato thinking custom",
+      };
+    }
+    async function saveInlineEditMessage(messageId) {
+      const s = currentSession();
+      if (!s || sending || editSubmittingMessageId === messageId) return;
+      const idx = s.messages.findIndex(x => x.id === messageId && x.role === "user");
+      if (idx === -1) {
+        clearEditMode();
+        return;
+      }
+      const editBoxEl = feedEl.querySelector(`article.msg.user[data-msg-id="${messageId}"] .msg-edit-box`);
+      const draftSource = (editBoxEl && typeof editBoxEl.value === "string") ? editBoxEl.value : editDraftText;
+      const newText = String(draftSource || "").trim();
+      if (!newText) {
+        setStatus("Il messaggio non puo essere vuoto", true);
+        return;
+      }
+      editSubmittingMessageId = messageId;
+      setSendingState(true);
+      setStatus("modifica inviata, rigenerazione risposta...");
+      s.messages[idx].text = newText;
+      s.messages[idx].at = now();
+      normalizeMessageSchema(s.messages[idx]);
+      const checkpoint = buildCheckpointFromEdit(s, idx, "inline_edit_save");
+      const responseInsertIndex = idx + 1;
+      const pendingAssistantId = crypto.randomUUID();
+      s.messages.splice(responseInsertIndex, 0, normalizeMessageSchema({
+        id: pendingAssistantId,
+        role: "assistant",
+        text: "",
+        thinking: "",
+        model: "stream",
+        intent: "streaming",
+        streaming: true,
+        at: now(),
+        checkpoint_id: checkpoint?.checkpoint_id || null,
+        parent_message_id: s.messages[idx]?.id || null,
+        branch_id: s.active_branch_id || checkpoint?.branch_id || null
+      }));
+      editingMessageId = null;
+      editDraftText = "";
+      s.updatedAt = now();
+      saveSessions();
+      renderSessions();
+      renderFeed();
+
+      const routing = getRoutingSelection();
+      const payload = {
+        prompt: newText,
+        mode: routing.mode,
+        model: routing.model,
+        profile: profileSel.value || null,
+        system_prompt: systemPromptInput.value.trim() || null,
+        allowed_directories: dirsInput.value.trim()
+          ? dirsInput.value.split(",").map(x => x.trim()).filter(Boolean)
+          : null,
+        think: thinkSel.value || null,
+        confirm_irreversible: !!confirmBox.checked,
+        max_tokens: Number(maxTok.value) || 2048,
+        temperature: 0.2
+      };
+
+      try {
+        const t0 = performance.now();
+        activeRequestController = new AbortController();
+        const r = await fetch(`${API}/llm`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: activeRequestController.signal
+        });
+        const data = await r.json();
+        const elapsed = Math.round(performance.now() - t0);
+        if (!r.ok) {
+          throw new Error(data.detail || JSON.stringify(data));
+        }
+
+        const pendingIdx = s.messages.findIndex(x => x.id === pendingAssistantId);
+        if (pendingIdx >= 0) {
+          const target = s.messages[pendingIdx];
+          target.text = data.response || "";
+          target.model = data.model_used || target.model;
+          target.intent = data.intent || "assistant";
+          target.streaming = false;
+          target.at = now();
+          normalizeMessageSchema(target);
+        } else {
+          s.messages.splice(responseInsertIndex, 0, normalizeMessageSchema({
+            id: crypto.randomUUID(),
+            role: "assistant",
+            text: data.response || "",
+            model: data.model_used,
+            intent: data.intent,
+            at: now(),
+            checkpoint_id: checkpoint?.checkpoint_id || null,
+            parent_message_id: s.messages[idx]?.id || null,
+            branch_id: s.active_branch_id || checkpoint?.branch_id || null
+          }));
+        }
+        s.updatedAt = now();
+        setStatus(`ok · ${elapsed} ms`);
+        // edit mode already closed before request
+      } catch (e) {
+        const pendingIdx = s.messages.findIndex(x => x.id === pendingAssistantId);
+        if (e.name === "AbortError") {
+          if (pendingIdx >= 0) {
+            const target = s.messages[pendingIdx];
+            target.text = "Generazione interrotta dall'utente.";
+            target.model = "system";
+            target.intent = "interrupted";
+            target.streaming = false;
+            target.at = now();
+            normalizeMessageSchema(target);
+          } else {
+            insertAssistantEvent(
+              s,
+              responseInsertIndex,
+              "Generazione interrotta dall'utente.",
+              "system",
+              "interrupted",
+              checkpoint
+            );
+          }
+          setStatus("generazione interrotta");
+          return;
+        }
+        if (pendingIdx >= 0) {
+          const target = s.messages[pendingIdx];
+          target.text = `Errore: ${String(e.message || e)}`;
+          target.model = "error";
+          target.intent = "error";
+          target.streaming = false;
+          target.at = now();
+          normalizeMessageSchema(target);
+        } else {
+          s.messages.splice(responseInsertIndex, 0, normalizeMessageSchema({
+            id: crypto.randomUUID(),
+            role: "assistant",
+            text: `Errore: ${String(e.message || e)}`,
+            model: "error",
+            intent: "error",
+            at: now(),
+            checkpoint_id: checkpoint?.checkpoint_id || null,
+            parent_message_id: s.messages[idx]?.id || null,
+            branch_id: s.active_branch_id || checkpoint?.branch_id || null
+          }));
+        }
+        setStatus("rigenerazione fallita", true);
+      } finally {
+        activeRequestController = null;
+        editSubmittingMessageId = null;
+        saveSessions();
+        renderSessions();
+        renderFeed();
+        setSendingState(false);
+      }
+    }
+
+    function renderAttachments() {
+      attachmentsBar.innerHTML = "";
+      for (const item of attachments) {
+        const chip = document.createElement("span");
+        chip.className = "chip";
+        chip.innerHTML = `${escapeHtml(item.name)} <button aria-label="Rimuovi allegato">x</button>`;
+        chip.querySelector("button").onclick = () => {
+          attachments = attachments.filter(x => x.id !== item.id);
+          renderAttachments();
+        };
+        attachmentsBar.appendChild(chip);
+      }
+    }
+
+    async function addFiles(fileList) {
+      const picked = Array.from(fileList || []);
+      for (const file of picked) {
+        const id = crypto.randomUUID();
+        const effectiveName = file.webkitRelativePath || file.name;
+        const entry = {
+          id,
+          name: effectiveName,
+          size: file.size,
+          type: file.type || "application/octet-stream",
+          preview: null
+        };
+
+        if ((file.type || "").startsWith("text/") || /\.(md|txt|py|js|ts|json|yaml|yml|html|css|sql|csv)$/i.test(file.name)) {
+          try {
+            const text = await file.text();
+            entry.preview = text.slice(0, 1200);
+          } catch {
+            entry.preview = null;
+          }
+        }
+        attachments.push(entry);
+      }
+      renderAttachments();
+      fileInput.value = "";
+    }
+
+    function composePromptWithAttachments(prompt) {
+      if (!attachments.length) {
+        return prompt;
+      }
+      const lines = attachments.map((a, idx) => {
+        const header = `${idx + 1}. ${a.name} (${a.type}, ${a.size} bytes)`;
+        if (!a.preview) {
+          return `${header}\n[preview non disponibile]`;
+        }
+        return `${header}\n${a.preview}`;
+      });
+      return `${prompt}\n\n[ALLEGATI]\n${lines.join("\n\n")}`;
+    }
+
+    async function streamLlmPayload(payload, signal, onEvent) {
+      const r = await fetch(`${API}/llm/stream`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        signal
+      });
+
+      if (!r.ok) {
+        const data = await r.json().catch(() => ({}));
+        throw new Error(data.detail || JSON.stringify(data) || "stream request failed");
+      }
+
+      if (!r.body) {
+        throw new Error("stream body non disponibile");
+      }
+
+      const reader = r.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) {
+          break;
+        }
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) {
+            continue;
+          }
+          let evt;
+          try {
+            evt = JSON.parse(trimmed);
+          } catch {
+            continue;
+          }
+          onEvent(evt);
+        }
+      }
+
+      const remaining = buffer.trim();
+      if (remaining) {
+        try {
+          onEvent(JSON.parse(remaining));
+        } catch {
+          // ignore invalid trailing chunk
+        }
+      }
+    }
+
+    async function refreshProfiles() {
+      try {
+        const r = await fetch(`${API}/profiles`);
+        const data = await r.json();
+        profileSel.innerHTML = "";
+        agentSel.innerHTML = '<option value="">Agente...</option>';
+        const profiles = data.profiles || [];
+        for (const p of profiles) {
+          const opt = document.createElement("option");
+          opt.value = p;
+          opt.textContent = p;
+          profileSel.appendChild(opt);
+          
+          const agentOpt = document.createElement("option");
+          agentOpt.value = p;
+          agentOpt.textContent = p.charAt(0).toUpperCase() + p.slice(1);
+          agentSel.appendChild(agentOpt);
+        }
+        if (data.default_profile) {
+          profileSel.value = data.default_profile;
+          agentSel.value = "";
+        }
+      } catch {
+        setStatus("errore caricamento profili", true);
+      }
+    }
+
+    async function sendPrompt() {
+      if (sending) {
+        if (activeRequestController) {
+          activeRequestController.abort();
+        }
+        return;
+      }
+      const prompt = promptInput.value.trim();
+      if (!prompt) return;
+
+      const s = currentSession();
+      if (!s) return;
+
+      setSendingState(true);
+      setStatus("invio richiesta...");
+      const promptForModel = composePromptWithAttachments(prompt);
+      let insertAt = s.messages.length;
+
+      if (editingMessageId) {
+        const idx = s.messages.findIndex(x => x.id === editingMessageId && x.role === "user");
+        if (idx === -1) {
+          clearEditMode();
+        } else {
+          s.messages[idx].text = prompt;
+          s.messages[idx].at = now();
+          normalizeMessageSchema(s.messages[idx]);
+          const checkpoint = buildCheckpointFromEdit(s, idx, "composer_edit_send");
+          if (checkpoint) {
+            insertAt = idx + 2;
+          } else {
+            insertAt = idx + 1;
+          }
+        }
+      }
+
+      if (!editingMessageId) {
+        const userMsg = normalizeMessageSchema({ id: crypto.randomUUID(), role: "user", text: prompt, at: now() });
+        s.messages.push(userMsg);
+        touchSessionTitle(prompt);
+        insertAt = s.messages.length;
+        if (USE_SERVER_STORAGE && serverSessionId) {
+          saveMessageToServer(serverSessionId, userMsg);
+        }
+      }
+
+      saveSessions();
+      renderSessions();
+      renderFeed();
+
+      const routing = getRoutingSelection();
+      const sessionAgent = s.agent || profileSel.value || null;
+      const payload = {
+        prompt: promptForModel,
+        mode: routing.mode,
+        model: routing.model,
+        profile: sessionAgent,
+        system_prompt: systemPromptInput.value.trim() || null,
+        allowed_directories: dirsInput.value.trim()
+          ? dirsInput.value.split(",").map(x => x.trim()).filter(Boolean)
+          : null,
+        think: thinkSel.value || null,
+        confirm_irreversible: !!confirmBox.checked,
+        max_tokens: Number(maxTok.value) || 2048,
+        temperature: 0.2
+      };
+
+      promptInput.value = "";
+      attachments = [];
+      renderAttachments();
+      let requiresFinalFeedRender = false;
+
+      try {
+        const t0 = performance.now();
+        const assistantMessage = normalizeMessageSchema({
+          id: crypto.randomUUID(),
+          role: "assistant",
+          text: "",
+          thinking: "",
+          model: "stream",
+          intent: "streaming",
+          think_requested: false,
+          think_applied: null,
+          think_status: "",
+          warnings: [],
+          streaming: true,
+          at: now()
+        });
+        s.messages.splice(insertAt, 0, assistantMessage);
+        s.updatedAt = now();
+        saveSessions();
+        renderFeed(false);
+
+        activeRequestController = new AbortController();
+        let doneEvent = null;
+        let lastStreamPatchAt = 0;
+        let streamRenderFallbackUsed = false;
+        const patchStreamTick = (force = false) => {
+          const nowTs = performance.now();
+          if (!force && nowTs - lastStreamPatchAt < 65) {
+            return;
+          }
+          lastStreamPatchAt = nowTs;
+          if (!patchAssistantMessageNode(assistantMessage)) {
+            if (!streamRenderFallbackUsed) {
+              streamRenderFallbackUsed = true;
+              renderFeed(false);
+            }
+          }
+        };
+
+        await streamLlmPayload(payload, activeRequestController.signal, (evt) => {
+          if (!evt || typeof evt !== "object") {
+            return;
+          }
+          if (evt.type === "error") {
+            throw new Error(evt.error || "stream error");
+          }
+          if (evt.type === "meta") {
+            assistantMessage.model = evt.model_used || assistantMessage.model;
+            assistantMessage.intent = evt.intent || assistantMessage.intent;
+            if (typeof evt.think_requested !== "undefined") {
+              assistantMessage.think_requested = !!evt.think_requested;
+            }
+            if (typeof evt.think_applied !== "undefined") {
+              assistantMessage.think_applied = evt.think_applied;
+            } else if (typeof evt.think !== "undefined") {
+              assistantMessage.think_applied = evt.think;
+            }
+            if (typeof evt.think_status === "string") {
+              assistantMessage.think_status = evt.think_status;
+            }
+            if (Array.isArray(evt.warnings)) {
+              assistantMessage.warnings = evt.warnings;
+            }
+            assistantMessage.at = now();
+            setStatus("streaming...");
+            patchStreamTick(true);
+            return;
+          }
+          if (evt.type === "token") {
+            assistantMessage.text += evt.token || "";
+            assistantMessage.at = now();
+            setStatus("streaming...");
+            patchStreamTick(false);
+            return;
+          }
+          if (evt.type === "thinking_token") {
+            assistantMessage.thinking += evt.token || "";
+            assistantMessage.at = now();
+            setStatus("streaming thinking...");
+            patchStreamTick(false);
+            return;
+          }
+          if (evt.type === "done") {
+            doneEvent = evt;
+            // Use only backend contract fields for state/context
+            if (typeof evt.thinking === "string") {
+              assistantMessage.thinking = evt.thinking;
+            }
+            if (typeof evt.response === "string") {
+              assistantMessage.text = evt.response;
+            } else {
+              assistantMessage.text = assistantMessage.text;
+            }
+            assistantMessage.model = evt.model_used || assistantMessage.model;
+            assistantMessage.intent = evt.intent || assistantMessage.intent;
+            if (typeof evt.think_requested !== "undefined") {
+              assistantMessage.think_requested = !!evt.think_requested;
+            }
+            if (typeof evt.think_applied !== "undefined") {
+              assistantMessage.think_applied = evt.think_applied;
+            }
+            if (typeof evt.think_status === "string") {
+              assistantMessage.think_status = evt.think_status;
+            }
+            if (Array.isArray(evt.warnings)) {
+              assistantMessage.warnings = evt.warnings;
+            }
+            assistantMessage.streaming = false;
+            assistantMessage.at = now();
+            patchStreamTick(true);
+            if (USE_SERVER_STORAGE && serverSessionId) {
+              saveMessageToServer(serverSessionId, assistantMessage);
+            }
+          }
+        });
+
+        if (!doneEvent) {
+          throw new Error("stream terminato senza evento finale");
+        }
+
+        const elapsed = Math.round(performance.now() - t0);
+        setStatus(`ok · ${elapsed} ms${doneEvent.fallback_used ? " · fallback" : ""}`);
+        clearEditMode(false);
+      } catch (e) {
+        if (e.name === "AbortError") {
+          const msg = s.messages[insertAt];
+          if (msg && msg.role === "assistant") {
+            msg.streaming = false;
+          }
+          insertAssistantEvent(s, insertAt + 1, "Generazione interrotta dall'utente.", "system", "interrupted");
+          requiresFinalFeedRender = true;
+          setStatus("generazione interrotta");
+          return;
+        }
+        const msg = s.messages[insertAt];
+        if (msg && msg.role === "assistant") {
+          msg.streaming = false;
+          msg.text = `Errore: ${String(e.message || e)}`;
+          msg.model = "error";
+          msg.intent = "error";
+          msg.at = now();
+        } else {
+          s.messages.splice(insertAt, 0, {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            text: `Errore: ${String(e.message || e)}`,
+            model: "error",
+            intent: "error",
+            at: now()
+          });
+        }
+        requiresFinalFeedRender = true;
+        setStatus("richiesta fallita", true);
+      } finally {
+        activeRequestController = null;
+        saveSessions();
+        renderSessions();
+        if (requiresFinalFeedRender) {
+          renderFeed();
+        }
+        setSendingState(false);
+      }
+    }
+
+    function escapeHtml(text) {
+      return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    modelSel.addEventListener("change", () => {
+      setStatus(modelSel.value === "auto" ? "auto-routing attivo" : `manual override: ${modelSel.value}`);
+    });
+
+    sendBtn.addEventListener("click", sendPrompt);
+
+    promptInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendPrompt();
+      }
+    });
+
+    newChatBtn.addEventListener("click", () => createSession("Nuova chat"));
+
+    agentSel.addEventListener("change", () => {
+      const s = sessions.find(x => x.id === currentId);
+      if (s) {
+        s.agent = agentSel.value || null;
+        saveSessions();
+      }
+    });
+
+    feedEl.addEventListener("scroll", () => {
+      if (isFeedNearBottom()) {
+        autoScrollEnabled = true;
+        hideUnreadIndicator();
+      } else {
+        autoScrollEnabled = false;
+      }
+    });
+
+    feedEl.addEventListener("wheel", (e) => {
+      if (e.deltaY < 0) {
+        autoScrollEnabled = false;
+      }
+    }, { passive: true });
+
+    jumpToLatestBtn.addEventListener("click", () => {
+      autoScrollEnabled = true;
+      applyAutoScroll({ force: true, incoming: false });
+    });
+
+    settingsBtn.addEventListener("click", openSettings);
+    closeSettingsBtn.addEventListener("click", closeSettings);
+    saveSettingsBtn.addEventListener("click", async () => {
+      if (persistPromptBox.checked) {
+        try {
+          const r = await fetch(`${API}/settings/system-prompt`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              system_prompt: systemPromptInput.value || "",
+              persist_to_config: true
+            })
+          });
+          const data = await r.json();
+          if (!r.ok) {
+            throw new Error(data.detail || JSON.stringify(data));
+          }
+          setStatus("impostazioni aggiornate e system prompt salvato su config");
+        } catch (e) {
+          setStatus(`salvataggio config fallito: ${String(e.message || e)}`, true);
+          return;
+        }
+      } else {
+        setStatus("impostazioni aggiornate");
+      }
+      closeSettings();
+    });
+    settingsModal.addEventListener("click", (e) => {
+      if (e.target === settingsModal) {
+        closeSettings();
+      }
+    });
+
+    function closeAttachMenu() {
+      attachMenu.classList.add("hidden");
+    }
+
+    function openFileTools() {
+      fileToolsModal.classList.remove("hidden");
+    }
+
+    function closeFileTools() {
+      fileToolsModal.classList.add("hidden");
+    }
+
+    attachBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      attachMenu.classList.toggle("hidden");
+    });
+
+    attachFilesAction.addEventListener("click", () => {
+      closeAttachMenu();
+      fileInput.click();
+    });
+
+    attachFolderAction.addEventListener("click", () => {
+      closeAttachMenu();
+      folderInput.click();
+    });
+
+    workspaceToolsAction.addEventListener("click", () => {
+      closeAttachMenu();
+      openFileTools();
+    });
+
+    fileInput.addEventListener("change", async (e) => {
+      await addFiles(e.target.files);
+      if (attachments.length) {
+        setStatus(`${attachments.length} allegato/i pronti`);
+      }
+    });
+
+    folderInput.addEventListener("change", async (e) => {
+      await addFiles(e.target.files);
+      if (attachments.length) {
+        setStatus(`${attachments.length} file cartella allegati`);
+      }
+    });
+
+    closeFileToolsBtn.addEventListener("click", closeFileTools);
+    fileToolsModal.addEventListener("click", (e) => {
+      if (e.target === fileToolsModal) {
+        closeFileTools();
+      }
+    });
+
+    browsePathBtn.addEventListener("click", async () => {
+      try {
+        const p = encodeURIComponent(browsePathInput.value.trim() || ".");
+        const r = await fetch(`${API}/fs/list?path=${p}`);
+        const data = await r.json();
+        if (!r.ok) {
+          throw new Error(data.detail || JSON.stringify(data));
+        }
+        const lines = (data.entries || []).map(x => `${x.kind === "dir" ? "[DIR]" : "[FILE]"} ${x.path}`);
+        browseResult.value = lines.join("\n") || "(vuoto)";
+      } catch (e) {
+        browseResult.value = `Errore: ${String(e.message || e)}`;
+      }
+    });
+
+    createFileBtn.addEventListener("click", async () => {
+      try {
+        const path = createFilePathInput.value.trim();
+        if (!path) {
+          setStatus("inserisci path file", true);
+          return;
+        }
+        const r = await fetch(`${API}/fs/create-file`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path, content: createFileContentInput.value || "", overwrite: false })
+        });
+        const data = await r.json();
+        if (!r.ok) {
+          throw new Error(data.detail || JSON.stringify(data));
+        }
+        setStatus(`file creato: ${data.path}`);
+      } catch (e) {
+        setStatus(`creazione file fallita: ${String(e.message || e)}`, true);
+      }
+    });
+
+    copyFileBtn.addEventListener("click", async () => {
+      try {
+        const source = copySourceInput.value.trim();
+        const destination = copyDestInput.value.trim();
+        if (!source || !destination) {
+          setStatus("inserisci sorgente e destinazione", true);
+          return;
+        }
+        const r = await fetch(`${API}/fs/copy-file`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ source, destination, overwrite: false })
+        });
+        const data = await r.json();
+        if (!r.ok) {
+          throw new Error(data.detail || JSON.stringify(data));
+        }
+        setStatus(`file copiato: ${data.destination}`);
+      } catch (e) {
+        setStatus(`copia file fallita: ${String(e.message || e)}`, true);
+      }
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest(".attach-anchor")) {
+        closeAttachMenu();
+      }
+    });
+
+    (async function boot() {
+      setStatus("caricamento...");
+      await loadSessions();
+      renderSessions();
+      renderFeed(true, true);
+      await refreshModels();
+      await refreshProfiles();
+      setSendingState(false);
+      setStatus("pronto");
+    })();
+  </script>
+</body>
+</html>

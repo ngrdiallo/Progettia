@@ -1,0 +1,123 @@
+{
+  "ollama": {
+    "base_url": "http://localhost:11434",
+    "timeout_seconds": 180,
+    "stream_read_timeout_seconds": 900
+  },
+  "models": {
+    "coding": "deepseek-coder:6.7b",
+    "reasoning": "deepseek-r1:8b",
+    "chat": "qwen2.5:7b",
+    "rag": "qwen3:latest",
+    "fast": "qwen2.5:7b"
+  },
+  "fallback_order": [
+    "qwen2.5:7b",
+    "mistral:latest",
+    "deepseek-r1:8b"
+  ],
+  "intent_keywords": {
+    "coding": [
+      "code",
+      "bug",
+      "fix",
+      "debug",
+      "function",
+      "script",
+      "python",
+      "javascript",
+      "typescript",
+      "sql",
+      "query",
+      "join",
+      "stacktrace",
+      "test"
+    ],
+    "reasoning": [
+      "analizza",
+      "ragiona",
+      "motiva",
+      "spiega passo",
+      "deduci",
+      "valuta",
+      "confronta"
+    ],
+    "rag": [
+      "rag",
+      "retrieval",
+      "embedding",
+      "rerank",
+      "knowledge base",
+      "vector",
+      "chunks"
+    ]
+  },
+  "routing": {
+    "short_prompt_chars": 60,
+    "max_handoffs_per_turn": 3,
+    "max_agent_calls_per_turn": 3,
+    "handoff_timeout_ms": 2000,
+    "escalation_threshold": 2
+  },
+  "default_profile": "safe",
+  "profiles": {
+    "safe": {
+      "system_prompt": "Priorita: accuratezza e sicurezza. Se manca evidenza, dichiara incertezza in modo esplicito. Non inventare dettagli personali o fatti non richiesti.",
+      "temperature": 0.2,
+      "max_tokens": 1024,
+      "think": "low",
+      "stop_sequences": [
+        "<|endoftext|>",
+        "<|im_start|>",
+        "<|im_end|>",
+        "<|end_of_text|>"
+      ]
+    },
+    "analysis": {
+      "system_prompt": "Modalita analitica: esplicita assunzioni, separa fatti da ipotesi, indica rischi e limiti.",
+      "temperature": 0.15,
+      "max_tokens": 2048,
+      "think": "medium",
+      "stop_sequences": [
+        "<|endoftext|>",
+        "<|im_start|>",
+        "<|im_end|>",
+        "<|end_of_text|>"
+      ]
+    }
+  },
+  "guardrails": {
+    "require_confirmation_for_irreversible": true,
+    "confirmation_token": "CONFERMO_AZIONE_IRREVERSIBILE",
+    "irreversible_patterns": [
+      "\\bgit\\s+reset\\s+--hard\\b",
+      "\\brm\\s+-rf\\b",
+      "\\bdel\\s+/f\\s+/q\\b",
+      "\\bformat\\s+[a-z]:\\b",
+      "\\btruncate\\s+-s\\s+0\\b",
+      "\\bdrop\\s+database\\b"
+    ]
+  },
+  "output_filters": {
+    "strip_control_tokens": true,
+    "control_token_patterns": [
+      "<\\|[^|>]+\\|>",
+      "<\\/thinking>",
+      "<thinking>"
+    ]
+  },
+  "prompting": {
+    "system_prompt": "Sei un assistente tecnico locale. Rispondi in modo accurato e sintetico. Se non hai certezza, dichiaralo esplicitamente.",
+    "enforce_directory_scope": true
+  },
+  "fs_tools": {
+    "allowlist": [
+      "."
+    ],
+    "budget": {
+      "max_calls": 60,
+      "window_seconds": 60
+    },
+    "audit_log": "logs/fs_audit.jsonl"
+  }
+}
