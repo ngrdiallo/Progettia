@@ -799,7 +799,11 @@
       </header>
 
       <section id="feed" class="feed"></section>
-      <button id="jumpToLatestBtn" class="jump-latest hidden" type="button" title="Vai all'ultimo messaggio">↓</button>
+      <button id="jumpToLatestBtn" class="jump-latest hidden" type="button" title="Vai all'ultimo messaggio" aria-label="Vai all'ultimo messaggio">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 5v14M19 12l-7 7-7-7"/>
+        </svg>
+      </button>
 
       <footer class="composer">
         <input id="fileInput" type="file" multiple hidden />
@@ -1235,11 +1239,9 @@
 
     function hideUnreadIndicator() {
       jumpToLatestBtn.classList.add("hidden");
-      jumpToLatestBtn.textContent = "↓";
     }
 
     function showUnreadIndicator() {
-      jumpToLatestBtn.textContent = "↓";
       jumpToLatestBtn.classList.remove("hidden");
     }
 
