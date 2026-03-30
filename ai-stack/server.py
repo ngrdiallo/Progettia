@@ -11,6 +11,7 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
+from ddgs import DDGS
 
 from router_core import LocalModelRouter, RouterError
 from chat_storage import ChatStorage
@@ -396,6 +397,41 @@ def create_app() -> FastAPI:
                 status_code=e.status_code,
             )
             raise
+
+    web_search_lock = threading.Lock()
+    web_search_requests: dict[str, list[float]] = {}
+
+    def _web_search_budget(client_key: str, max_calls: int = 10, window_seconds: int = 60) -> None:
+        now = time.time()
+        with web_search_lock:
+            bucket = [ts for ts in web_search_requests.get(client_key, []) if (now - ts) <= window_seconds]
+            if len(bucket) >= max_calls:
+                raise HTTPException(status_code=429, detail=f"Web search budget exceeded ({max_calls}/{window_seconds}s)")
+            bucket.append(now)
+            web_search_requests[client_key] = bucket
+
+    @app.get("/web/search")
+    def web_search(request: Request, q: str = Query(..., description="Search query"), max_results: int = Query(5, ge=1, le=20)) -> dict:
+        client = request.client.host if request.client else "local"
+        _web_search_budget(client)
+
+        try:
+            with DDGS() as ddgs:
+                results = list(ddgs.text(q, max_results=max_results))
+            return {
+                "query": q,
+                "results": [
+                    {
+                        "title": r.get("title"),
+                        "url": r.get("href"),
+                        "snippet": r.get("body")
+                    }
+                    for r in results
+                ],
+                "count": len(results)
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Web search failed: {str(e)}")
 
     @app.post("/settings/system-prompt")
     def persist_system_prompt(req: PersistSystemPromptRequest) -> dict:
