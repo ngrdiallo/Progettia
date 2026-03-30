@@ -266,12 +266,73 @@ def create_app() -> FastAPI:
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e)) from e
 
+    WEB_SEARCH_KEYWORDS = [
+        "cerca", "cercami", "ricerca", "web", "internet", "online",
+        "informati", "informazioni", "info su", "cosa dice",
+        "search", "find", "look up", "what is", "who is",
+        "notizie", "news", "aggiornami", "verifica"
+    ]
+
+    def _auto_web_search(prompt: str, provider: str | None) -> str:
+        prompt_lower = prompt.lower()
+        needs_search = any(kw in prompt_lower for kw in WEB_SEARCH_KEYWORDS)
+        if not needs_search:
+            return prompt
+        
+        import re
+        query = None
+        for pattern in [
+            r'cerca\s+(?:in\s+)?(?:web\s+)?(?:su\s+)?(.+?)(?:\?|$)',
+            r'ricerca\s+(?:in\s+)?(?:web\s+)?(?:su\s+)?(.+?)(?:\?|$)',
+            r'search\s+(?:in\s+)?(?:web\s+)?(?:for\s+)?(.+?)(?:\?|$)',
+            r'informati\s+(?:su\s+)?(.+?)(?:\?|$)',
+            r'informazioni\s+su\s+(.+?)(?:\?|$)',
+            r'verifica\s+(?:chi|cosa|se)\s+(.+?)(?:\?|$)',
+            r'what\s+is\s+(?:the\s+)?(.+?)(?:\?|$)',
+            r'who\s+is\s+(.+?)(?:\?|$)',
+        ]:
+            match = re.search(pattern, prompt_lower)
+            if match:
+                query = match.group(1).strip()
+                break
+        
+        if not query:
+            return prompt
+        if len(query) < 2:
+            return prompt
+        
+        try:
+            effective_provider = provider if provider else "duckduckgo"
+            if effective_provider == "tavily":
+                tavily = TavilyClient(api_key=TAVILY_API_KEY)
+                response = tavily.search(query=query, max_results=5)
+                results = response.get("results", [])
+            else:
+                with DDGS() as ddgs:
+                    results = list(ddgs.text(query, max_results=5))
+            
+            if not results:
+                return prompt
+            
+            results_text = "\n\n".join([
+                f"- {r.get('title')}: {r.get('url')} — {r.get('body', r.get('content', ''))[:200]}"
+                for r in results[:5]
+            ])
+            
+            enhanced = f"[RISULTATI RICERCA WEB per '{query}']\n{results_text}\n\n[/RISULTATI]\n\n{prompt}"
+            return enhanced
+        except Exception as e:
+            print(f"[WEB SEARCH AUTO] Error: {e}")
+            return prompt
+
     @app.post("/llm/stream")
     def llm_stream(req: LlmRequest) -> StreamingResponse:
+        effective_prompt = _auto_web_search(req.prompt, req.web_search_provider)
+        
         def stream_iter():
             try:
                 for event in router.generate_stream(
-                    prompt=req.prompt,
+                    prompt=effective_prompt,
                     mode=req.mode,
                     manual_model=req.model,
                     profile=req.profile,
