@@ -20,14 +20,16 @@ def test_web_search_endpoint_structure() -> None:
     app = create_app()
     client = TestClient(app)
     
-    response = client.get("/web/search", params={"q": "test", "max_results": 3})
+    response = client.get("/web/search", params={"q": "test", "max_results": 3, "provider": "duckduckgo"})
     
     _assert(response.status_code == 200, f"expected 200, got {response.status_code}")
     data = response.json()
     _assert("query" in data, "response should contain query")
     _assert("results" in data, "response should contain results")
     _assert("count" in data, "response should contain count")
+    _assert("provider" in data, "response should contain provider")
     _assert(data["query"] == "test", "query should match")
+    _assert(data["provider"] == "duckduckgo", "provider should be duckduckgo")
     
     for result in data.get("results", []):
         _assert("title" in result, "result should have title")
@@ -35,6 +37,23 @@ def test_web_search_endpoint_structure() -> None:
         _assert("snippet" in result, "result should have snippet")
     
     print("WEB_SEARCH_ENDPOINT_OK")
+
+
+def test_tavily_provider() -> None:
+    from server import create_app
+    from fastapi.testclient import TestClient
+    
+    app = create_app()
+    client = TestClient(app)
+    
+    response = client.get("/web/search", params={"q": "artificial intelligence", "max_results": 3, "provider": "tavily"})
+    
+    _assert(response.status_code == 200, f"expected 200, got {response.status_code}")
+    data = response.json()
+    _assert(data["provider"] == "tavily", "provider should be tavily")
+    _assert(len(data["results"]) > 0, "should return results")
+    
+    print("TAVILY_PROVIDER_OK")
 
 
 def test_web_search_budget_exceeded() -> None:
@@ -56,6 +75,7 @@ def test_web_search_budget_exceeded() -> None:
 
 def main() -> None:
     test_web_search_endpoint_structure()
+    test_tavily_provider()
     test_web_search_budget_exceeded()
     print("ALL_WEB_SEARCH_TESTS_OK")
 

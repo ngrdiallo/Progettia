@@ -11,6 +11,7 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
+from ddgs import DDGS
 from tavily import TavilyClient
 
 from router_core import LocalModelRouter, RouterError
@@ -413,26 +414,49 @@ def create_app() -> FastAPI:
     TAVILY_API_KEY = "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"
 
     @app.get("/web/search")
-    def web_search(request: Request, q: str = Query(..., description="Search query"), max_results: int = Query(5, ge=1, le=20)) -> dict:
+    def web_search(
+        request: Request,
+        q: str = Query(..., description="Search query"),
+        max_results: int = Query(5, ge=1, le=20),
+        provider: str = Query("duckduckgo", description="Provider: duckduckgo or tavily")
+    ) -> dict:
         client = request.client.host if request.client else "local"
         _web_search_budget(client)
 
         try:
-            tavily = TavilyClient(api_key=TAVILY_API_KEY)
-            response = tavily.search(query=q, max_results=max_results)
-            results = response.get("results", [])
-            return {
-                "query": q,
-                "results": [
-                    {
-                        "title": r.get("title"),
-                        "url": r.get("url"),
-                        "snippet": r.get("content")
-                    }
-                    for r in results
-                ],
-                "count": len(results)
-            }
+            if provider == "tavily":
+                tavily = TavilyClient(api_key=TAVILY_API_KEY)
+                response = tavily.search(query=q, max_results=max_results)
+                results = response.get("results", [])
+                return {
+                    "query": q,
+                    "provider": "tavily",
+                    "results": [
+                        {
+                            "title": r.get("title"),
+                            "url": r.get("url"),
+                            "snippet": r.get("content")
+                        }
+                        for r in results
+                    ],
+                    "count": len(results)
+                }
+            else:
+                with DDGS() as ddgs:
+                    results = list(ddgs.text(q, max_results=max_results))
+                return {
+                    "query": q,
+                    "provider": "duckduckgo",
+                    "results": [
+                        {
+                            "title": r.get("title"),
+                            "url": r.get("href"),
+                            "snippet": r.get("body")
+                        }
+                        for r in results
+                    ],
+                    "count": len(results)
+                }
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Web search failed: {str(e)}")
 
