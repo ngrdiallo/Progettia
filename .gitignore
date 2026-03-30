@@ -1,0 +1,21 @@
+# Python env/cache
+.venv/
+**/__pycache__/
+**/.pytest_cache/
+
+# Local duplicate workspaces (do not track)
+ai-stack-vsc/
+
+# Runtime/local artifacts
+*.log
+*.db
+*.sqlite
+*.sqlite3
+nul
+_tmp_*
+opencode.bat
+
+# IDE noise
+.vscode/
+.idea/
+*.swp
