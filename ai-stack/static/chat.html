@@ -620,6 +620,10 @@
       width: 128px;
     }
 
+    #webSearchProvider {
+      width: 130px;
+    }
+
     .left-controls {
       display: flex;
       align-items: center;
@@ -831,6 +835,12 @@
                     <option value="medium">conversation</option>
                     <option value="low">fast</option>
                   </select>
+                  <label class="pill" for="webSearchProvider">ricerca</label>
+                  <select id="webSearchProvider">
+                    <option value="">auto (chiedi)</option>
+                    <option value="duckduckgo">DuckDuckGo</option>
+                    <option value="tavily">Tavily</option>
+                  </select>
                   <button id="sendBtn" class="btn primary">Invia</button>
                 </div>
               </div>
@@ -1019,6 +1029,7 @@
     const maxTok = document.getElementById("maxTok");
     const profileSel = document.getElementById("profileSel");
     const thinkSel = document.getElementById("thinkSel");
+    const webSearchProviderSel = document.getElementById("webSearchProvider");
     const confirmBox = document.getElementById("confirmBox");
     const persistPromptBox = document.getElementById("persistPromptBox");
     const settingsBtn = document.getElementById("settingsBtn");
@@ -2168,6 +2179,7 @@
           ? dirsInput.value.split(",").map(x => x.trim()).filter(Boolean)
           : null,
         think: thinkSel.value || null,
+        web_search_provider: webSearchProviderSel.value || null,
         confirm_irreversible: !!confirmBox.checked,
         max_tokens: Number(maxTok.value) || 2048,
         temperature: 0.2

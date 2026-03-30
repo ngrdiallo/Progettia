@@ -45,6 +45,7 @@ class LlmRequest(BaseModel):
     temperature: float | None = Field(default=None, ge=0.0, le=2.0)
     max_tokens: int | None = Field(default=None, ge=1, le=8192)
     think: bool | str | None = None
+    web_search_provider: str | None = None
     confirm_irreversible: bool = False
 
 
